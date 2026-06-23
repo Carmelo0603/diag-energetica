@@ -3,13 +3,16 @@ import { useNavigate, Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/database";
 import { NORMATIVA_LUX } from "../data/normativa_lux";
-import { Plus, Building2, ChevronRight } from "lucide-react";
+import { Plus, Building2, ChevronRight, Trash2, Edit3 } from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [nomeProgetto, setNomeProgetto] = useState("");
   const [macroCategoria, setMacroCategoria] = useState("");
   const [tipologiaSpecifica, setTipologiaSpecifica] = useState("");
+
+  const [edificioInModifica, setEdificioInModifica] = useState(null);
+  const [nuovoNomeEdificio, setNuovoNomeEdificio] = useState("");
 
   const edifici = useLiveQuery(() => db.edifici.orderBy("data_creazione").reverse().toArray());
 
@@ -26,10 +29,35 @@ export default function Dashboard() {
       macro_categoria: macroCategoria,
       tipologia: tipologiaFinale,
       pods: [],
+      pdr: "",
       data_creazione: new Date().toISOString(),
     });
 
+    setNomeProgetto("");
+    setMacroCategoria("");
+    setTipologiaSpecifica("");
     navigate(`/edificio/${id}`);
+  };
+
+  const handleEliminaEdificio = async (e, id) => {
+    e.preventDefault();
+    if (window.confirm("Attenzione: eliminando il cantiere cancellerai tutte le sue stanze e l'intero inventario. Procedere?")) {
+      await db.edifici.delete(id);
+      await db.ambienti.where("id_edificio").equals(id).delete();
+    }
+  };
+
+  const avviaModificaEdificio = (e, ed) => {
+    e.preventDefault();
+    setEdificioInModifica(ed.id);
+    setNuovoNomeEdificio(ed.nome);
+  };
+
+  const salvaModificaEdificio = async (e, id) => {
+    e.preventDefault();
+    if (!nuovoNomeEdificio.trim()) return;
+    await db.edifici.update(id, { nome: nuovoNomeEdificio.trim() });
+    setEdificioInModifica(null);
   };
 
   return (
@@ -103,17 +131,47 @@ export default function Dashboard() {
         </h2>
         <div className="grid gap-4">
           {edifici?.map((edificio) => (
-            <Link
-              key={edificio.id}
-              to={`/edificio/${edificio.id}`}
-              className="border-2 border-white p-6 flex items-center justify-between hover:bg-green-500 hover:text-black hover:border-green-500 transition-none group"
-            >
-              <div>
-                <h3 className="text-2xl font-black uppercase tracking-tighter">{edificio.nome}</h3>
-                <p className="text-sm font-bold mt-2 uppercase opacity-80">{NORMATIVA_LUX[edificio.tipologia]?.label || edificio.tipologia}</p>
+            <div key={edificio.id} className="border-2 border-white p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <div className="flex-1">
+                {edificioInModifica === edificio.id ? (
+                  <form onSubmit={(e) => salvaModificaEdificio(e, edificio.id)} className="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      value={nuovoNomeEdificio}
+                      onChange={(e) => setNuovoNomeEdificio(e.target.value)}
+                      className="bg-black border-2 border-green-500 p-2 text-white font-bold flex-1"
+                    />
+                    <button type="submit" className="bg-green-500 text-black px-4 font-bold text-xs uppercase">
+                      Salva
+                    </button>
+                    <button type="button" onClick={() => setEdificioInModifica(null)} className="border-2 border-white px-4 font-bold text-xs uppercase">
+                      Annulla
+                    </button>
+                  </form>
+                ) : (
+                  <Link to={`/edificio/${edificio.id}`} className="group block">
+                    <h3 className="text-2xl font-black uppercase tracking-tighter group-hover:text-green-500">{edificio.nome}</h3>
+                    <p className="text-sm font-bold mt-2 uppercase opacity-80 text-zinc-400">
+                      {NORMATIVA_LUX[edificio.tipologia]?.label || edificio.tipologia}
+                    </p>
+                  </Link>
+                )}
               </div>
-              <ChevronRight size={32} className="group-hover:text-black" />
-            </Link>
+              <div className="flex gap-2 border-t-2 border-dashed sm:border-0 border-zinc-800 pt-3 sm:pt-0 justify-end">
+                <button onClick={(e) => avviaModificaEdificio(e, edificio)} className="p-2 border border-white hover:bg-white hover:text-black text-white">
+                  <Edit3 size={18} />
+                </button>
+                <button
+                  onClick={(e) => handleEliminaEdificio(e, edificio.id)}
+                  className="p-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-black"
+                >
+                  <Trash2 size={18} />
+                </button>
+                <Link to={`/edificio/${edificio.id}`} className="p-2 border border-green-500 text-green-500 hover:bg-green-500 hover:text-black">
+                  <ChevronRight size={18} />
+                </Link>
+              </div>
+            </div>
           ))}
         </div>
       </section>
