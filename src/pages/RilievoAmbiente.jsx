@@ -60,6 +60,7 @@ export default function RilievoAmbiente() {
   const [tipoInserimento, setTipoInserimento] = useState('luci');
   const [elementoInModifica, setElementoInModifica] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
+  const [alertMessaggio, setAlertMessaggio] = useState(''); // Nuovo stato per il toast alert
 
   const ambiente = useLiveQuery(() => db.ambienti.get(idAmbiente));
 
@@ -84,17 +85,28 @@ export default function RilievoAmbiente() {
   if (!ambiente) return null;
 
   const elementi = ambiente.elementi_inseriti || [];
-  const elementiFiltrati = elementi.filter(el => el.categoria === MAPPA_CATEGORIE[tipoInserimento]);
+
+  // Aggiunto .reverse() per ordinare dal più recente al più vecchio
+  const elementiFiltrati = elementi
+      .filter(el => el.categoria === MAPPA_CATEGORIE[tipoInserimento])
+      .reverse();
 
   const handleSalvaElemento = async (elementoCorrente) => {
     let elementiAggiornati;
-    if (elementoInModifica) {
+    let isModifica = !!elementoInModifica;
+
+    if (isModifica) {
       elementiAggiornati = elementi.map(el => el.id_istanza === elementoCorrente.id_istanza ? elementoCorrente : el);
       setElementoInModifica(null);
     } else {
       elementiAggiornati = [...elementi, elementoCorrente];
     }
+
     await db.ambienti.update(idAmbiente, { elementi_inseriti: elementiAggiornati });
+
+    // Gestione Alert (Toast)
+    setAlertMessaggio(isModifica ? "ELEMENTO AGGIORNATO" : "ELEMENTO REGISTRATO");
+    setTimeout(() => setAlertMessaggio(''), 2000);
   };
 
   const handleRimuoviElemento = async (idIstanza) => {
@@ -109,13 +121,21 @@ export default function RilievoAmbiente() {
   };
 
   return (
-      <div className="space-y-12">
+      <div className="space-y-12 relative">
+
+        {/* Toast Alert Fluttuante */}
+        {alertMessaggio && (
+            <div className="fixed bottom-8 right-8 bg-green-500 text-black px-6 py-4 font-black uppercase text-lg border-4 border-white shadow-[8px_8px_0_0_#fff] z-50 animate-bounce">
+              {alertMessaggio}
+            </div>
+        )}
+
         <div className="border-4 border-white p-6">
           <Link to={`/edificio/${ambiente.id_edificio}`} className="inline-flex items-center font-bold text-white hover:text-green-500 mb-4 uppercase transition-none"><ArrowLeft size={20} className="mr-2" /> Fabbricato</Link>
           <div className="flex flex-col sm:flex-row justify-between items-start">
             <div>
               <h2 className="text-4xl font-black tracking-tighter uppercase">{ambiente.nome}</h2>
-              <p className="font-bold text-green-500 mt-2 uppercase">PIANO: {ambiente.piano} | {ambiente.mq} MQ | TARGET: {ambiente.lux_normativi} LUX</p>
+              <p className="font-bold text-green-500 mt-2 uppercase">PIANO: {ambiente.piano} | {ambiente.mq || "NON SPECIFICATO"} MQ | TARGET: {ambiente.lux_normativi} LUX</p>
             </div>
             <div className="mt-4 sm:mt-0 border-4 border-white p-4 text-center min-w-[120px]">
               <span className="block text-4xl font-black">{elementiFiltrati.length}</span>

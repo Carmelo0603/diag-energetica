@@ -16,14 +16,31 @@ export async function syncData() {
         // FASE 1: PUSH (Da Locale a Cloud)
         // ==========================================
 
-        const edificiDaInviare = await db.edifici.where('is_synced').equals(0).toArray();
-        const ambientiDaInviare = await db.ambienti.where('is_synced').equals(0).toArray();
+// Invece di usare il .where() che ignora gli 'undefined', peschiamo tutto
+        const tuttiEdifici = await db.edifici.toArray();
+        const tuttiAmbienti = await db.ambienti.toArray();
 
-        // Aggiungiamo il user_id richiesto dalle policy di Supabase
-        const edificiPayload = edificiDaInviare.map(({ is_synced, ...e }) => ({ ...e, user_id: userId }));
-        const ambientiPayload = ambientiDaInviare.map(({ is_synced, ...a }) => ({ ...a, user_id: userId }));
+// Filtriamo a mano in Javascript: prendiamo quelli con 0 OPPURE i vecchi progetti (undefined)
+        const edificiDaInviare = tuttiEdifici.filter(e => e.is_synced === 0 || e.is_synced === undefined);
+        const ambientiDaInviare = tuttiAmbienti.filter(a => a.is_synced === 0 || a.is_synced === undefined);
 
-        // Mandiamo tutto su (Upsert fa insert se non esiste, update se l'id esiste già)
+// Prepariamo i payload per Supabase:
+// 1. Togliamo is_synced (che a Supabase non piace)
+// 2. Aggiungiamo lo user_id
+// 3. Ci assicuriamo che ci sia una data in last_modified
+        const edificiPayload = edificiDaInviare.map(({ is_synced, ...e }) => ({
+            ...e,
+            user_id: userId,
+            last_modified: e.last_modified || new Date().toISOString()
+        }));
+
+        const ambientiPayload = ambientiDaInviare.map(({ is_synced, ...a }) => ({
+            ...a,
+            user_id: userId,
+            last_modified: a.last_modified || new Date().toISOString()
+        }));
+
+// Mandiamo tutto su Supabase
         if (edificiPayload.length > 0) {
             const { error } = await supabase.from('edifici').upsert(edificiPayload);
             if (error) throw new Error(`Errore Push Edifici: ${error.message}`);
@@ -34,15 +51,13 @@ export async function syncData() {
             if (error) throw new Error(`Errore Push Ambienti: ${error.message}`);
         }
 
-        // Se il push va a buon fine, ripuliamo Dexie segnando i record come sincronizzati.
-        // Usiamo una transazione locale per sicurezza.
+// Aggiorniamo i record salvati in locale, segnandoli come sincronizzati (1) e aggiungendo il user_id locale
         await db.transaction('rw', db.edifici, db.ambienti, async () => {
             for (let e of edificiDaInviare) {
-                // Aggiorniamo ignorando i nostri stessi hook per non ri-cambiare la data
-                await db.edifici.update(e.id, { is_synced: 1 });
+                await db.edifici.update(e.id, { is_synced: 1, user_id: userId });
             }
             for (let a of ambientiDaInviare) {
-                await db.ambienti.update(a.id, { is_synced: 1 });
+                await db.ambienti.update(a.id, { is_synced: 1, user_id: userId });
             }
         });
 
