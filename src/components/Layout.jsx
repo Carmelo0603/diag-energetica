@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useParams, useLocation } from 'react-router-dom';
+import { Outlet, Link, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
-import { Download, ChevronDown } from 'lucide-react';
+import { Download, ChevronDown, LogOut } from 'lucide-react';
 import { esportaRilievoExcel } from '../utils/exportExcel';
 import SearchBar from './SearchBar';
-import useSync from "../hooks/useSync.jsx";
+import useSync from "../hooks/useSync";
+import { supabase } from '../lib/supabaseClient';
 
 export default function Layout() {
     const { idEdificio, idAmbiente } = useParams();
     const location = useLocation();
+    const navigate = useNavigate();
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     useSync();
 
@@ -26,6 +28,31 @@ export default function Layout() {
         esportaRilievoExcel(effEdificioId, tipo);
     };
 
+    const handleLogout = async () => {
+        const confermato = window.confirm(
+            "ATTENZIONE: Stai per uscire. Assicurati che l'app abbia sincronizzato i dati (notifica verde in basso), altrimenti perderai le ultime modifiche offline. Vuoi procedere?"
+        );
+
+        if (confermato) {
+            try {
+                // Svuotiamo il database locale per impedire al prossimo utente di vedere/sporcare i dati
+                await db.transaction('rw', db.edifici, db.ambienti, async () => {
+                    await db.edifici.clear();
+                    await db.ambienti.clear();
+                });
+
+                // Disconnessione effettiva da Supabase
+                await supabase.auth.signOut();
+
+                // Il redirect ci riporta brutalmente alla pagina di login
+                navigate('/login');
+            } catch (error) {
+                console.error("Errore durante il logout:", error);
+                alert("Si è verificato un errore durante la disconnessione.");
+            }
+        }
+    };
+
     let searchPlaceholder = "CERCA CANTIERI O FORNITURE...";
     if (idAmbiente) searchPlaceholder = "CERCA NELL'INVENTARIO...";
     else if (idEdificio) searchPlaceholder = "CERCA STANZE O PIANI...";
@@ -33,7 +60,18 @@ export default function Layout() {
     return (
         <div className="min-h-screen flex flex-col bg-black text-white font-sans">
             <header className="border-b-4 border-white p-6 sticky top-0 z-50 bg-black flex flex-col items-center gap-4 relative">
-                <Link to="/" className="font-mono text-4xl font-black tracking-tighter hover:text-green-500 transition-colors uppercase">
+
+                {/* Pulsante Logout */}
+                <button
+                    onClick={handleLogout}
+                    className="absolute left-4 top-4 z-50 bg-black text-white p-2 border-2 border-white hover:bg-red-500 hover:border-red-500 hover:text-black transition-none flex items-center gap-2 shadow-md"
+                    title="Disconnetti account"
+                >
+                    <LogOut size={24} />
+                    <span className="hidden sm:inline font-black uppercase text-sm">Esci</span>
+                </button>
+
+                <Link to="/" className="font-mono text-4xl font-black tracking-tighter hover:text-green-500 transition-colors uppercase mt-8 sm:mt-0">
                     UBIARCHIUM
                 </Link>
 
@@ -55,7 +93,6 @@ export default function Layout() {
                                 <button onClick={() => handleExport('termico')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">TERMICO</button>
                                 <button onClick={() => handleExport('infissi')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">INFISSI</button>
                                 <button onClick={() => handleExport('apparecchi')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">APPARECCHI</button>
-                                {/* Ti eri perso questo 👇 */}
                                 <button onClick={() => handleExport('elettrico')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black transition-none">RIEPILOGO ELETTRICO</button>
                             </div>
                         )}
