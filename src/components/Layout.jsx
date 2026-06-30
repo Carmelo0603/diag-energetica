@@ -38,16 +38,16 @@ export default function Layout() {
                 <SearchBar idEdificio={effEdificioId} idAmbiente={idAmbiente} placeholder={searchPlaceholder} />
 
                 {edificio && (
-                    <div className="absolute right-6 top-6 hidden sm:block">
+                    <div className="absolute right-4 top-4 z-50">
                         <button
                             onClick={() => setExportMenuOpen(!exportMenuOpen)}
-                            className="bg-white text-black p-2 hover:bg-green-500 border-2 border-white hover:border-green-500 flex items-center gap-1 transition-none"
+                            className="bg-white text-black p-2 hover:bg-green-500 border-2 border-white hover:border-green-500 flex items-center gap-1 transition-none shadow-md"
                         >
                             <Download size={24} />
                             <ChevronDown size={16} />
                         </button>
                         {exportMenuOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-black border-4 border-white flex flex-col z-50 shadow-2xl">
+                            <div className="absolute right-0 top-full mt-2 w-64 bg-black border-4 border-white flex flex-col shadow-2xl">
                                 <button onClick={() => handleExport('tutto')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">TABELLA COMPLETA</button>
                                 <button onClick={() => handleExport('illuminazione')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">ILLUMINAZIONE</button>
                                 <button onClick={() => handleExport('termico')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">TERMICO</button>
@@ -72,7 +72,6 @@ export default function Layout() {
             </header>
 
             <main className="flex-1 p-6 w-full max-w-4xl mx-auto">
-                {/* Avendo tolto la logica di filtraggio in-page, l'Outlet non ha più bisogno del context */}
                 <Outlet />
             </main>
         </div>

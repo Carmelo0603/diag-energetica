@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import { ArrowLeft, Trash2, Lightbulb, MonitorPlay, Thermometer, PenLine, Grid } from 'lucide-react';
@@ -14,6 +14,13 @@ const MAPPA_CATEGORIE = {
   'infissi': 'infissi'
 };
 
+const TAB_DA_CATEGORIA = {
+  'illuminazione': 'luci',
+  'apparecchio': 'apparecchi',
+  'termico': 'termico',
+  'infissi': 'infissi'
+};
+
 const MAPPA_TITOLI = {
   'luci': 'LUCI',
   'apparecchi': 'APPARECCHIATURE',
@@ -21,19 +28,62 @@ const MAPPA_TITOLI = {
   'infissi': 'INFISSI'
 };
 
-export default function RilievoAmbiente() {
+const renderTermicoLabel = (el) => {
+  switch(el.sotto_categoria) {
+    case 'radiatore': return `${el.tipologia} (${el.altezza_label})`;
+    case 'split': return el.label;
+    case 'fancoil': return `Fancoil ${el.marca} ${el.modello}`;
+    case 'canalizzato': return `Macchina Canalizzato`;
+    case 'pavimento_radiante': return `Pavimento Radiante ${el.marca} ${el.modello}`;
+    case 'soffitto_radiante': return `Soffitto Radiante ${el.marca} ${el.modello}`;
+    default: return el.label || 'SISTEMA TERMICO';
+  }
+};
 
+const renderTermicoStats = (el) => {
+  switch(el.sotto_categoria) {
+    case 'radiatore': return `N. ${el.numero_elementi} EL. | ${el.carico_totale_w} W`;
+    case 'split': return `${el.carico_totale_w} W`;
+    case 'fancoil': return `Q.TA: ${el.quantita} | RISC: ${el.potenza_risc}W | RAFF: ${el.potenza_raff}W`;
+    case 'canalizzato': return `POTENZA MACCHINA: ${el.potenza_macchina}W`;
+    case 'pavimento_radiante':
+    case 'soffitto_radiante': return `SUP: ${el.superficie} MQ | PASSO POSA: ${el.passo_posa}`;
+    default: return '';
+  }
+};
+
+export default function RilievoAmbiente() {
   const { idAmbiente } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [tipoInserimento, setTipoInserimento] = useState('luci');
   const [elementoInModifica, setElementoInModifica] = useState(null);
+  const [highlightedId, setHighlightedId] = useState(null);
 
   const ambiente = useLiveQuery(() => db.ambienti.get(idAmbiente));
+
+  useEffect(() => {
+    if (ambiente && location.state?.highlight) {
+      const hId = location.state.highlight;
+      const targetEl = ambiente.elementi_inseriti?.find(e => e.id_istanza === hId);
+
+      if (targetEl) {
+        setTipoInserimento(TAB_DA_CATEGORIA[targetEl.categoria] || 'luci');
+        setHighlightedId(hId);
+        setTimeout(() => {
+          const elDom = document.getElementById(hId);
+          if (elDom) elDom.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+        setTimeout(() => setHighlightedId(null), 3000);
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, ambiente, navigate, location.pathname]);
 
   if (!ambiente) return null;
 
   const elementi = ambiente.elementi_inseriti || [];
-
-  // Filtriamo gli elementi SOLO in base al tab attualmente selezionato
   const elementiFiltrati = elementi.filter(el => el.categoria === MAPPA_CATEGORIE[tipoInserimento]);
 
   const handleSalvaElemento = async (elementoCorrente) => {
@@ -54,10 +104,7 @@ export default function RilievoAmbiente() {
 
   const impostaModifica = (el) => {
     setElementoInModifica(el);
-    if (el.categoria === 'termico') setTipoInserimento('termico');
-    else if (el.categoria === 'illuminazione') setTipoInserimento('luci');
-    else if (el.categoria === 'infissi') setTipoInserimento('infissi');
-    else setTipoInserimento('apparecchi');
+    setTipoInserimento(TAB_DA_CATEGORIA[el.categoria] || 'luci');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -103,18 +150,24 @@ export default function RilievoAmbiente() {
           {elementiFiltrati.length === 0 ? <p className="font-bold uppercase p-6 border-2 border-dashed border-zinc-700 text-center text-zinc-500">Nessun asset censito in questa categoria.</p> : (
               <div className="grid gap-4">
                 {elementiFiltrati.map(el => (
-                    <div key={el.id_istanza} className={`border-2 border-white p-4 flex flex-col sm:flex-row justify-between sm:items-center ${elementoInModifica?.id_istanza === el.id_istanza ? 'bg-green-950 border-green-500' : ''}`}>
+                    <div
+                        key={el.id_istanza}
+                        id={el.id_istanza}
+                        className={`p-4 flex flex-col sm:flex-row justify-between sm:items-center transition-all duration-700 border-2 ${
+                            highlightedId === el.id_istanza
+                                ? 'bg-green-900 border-green-500 scale-[1.02] shadow-[0_0_20px_rgba(34,197,94,0.4)]'
+                                : (elementoInModifica?.id_istanza === el.id_istanza ? 'bg-green-950 border-green-500' : 'border-white bg-black')
+                        }`}
+                    >
                       <div>
                         <p className="text-xl font-black uppercase">
-                          {el.categoria === 'termico' && el.sotto_categoria === 'split' ? el.label : ''}
-                          {el.categoria === 'termico' && el.sotto_categoria === 'radiatore' ? `${el.tipologia} (${el.altezza_label})` : ''}
+                          {el.categoria === 'termico' ? renderTermicoLabel(el) : ''}
                           {el.categoria === 'infissi' ? `Infisso ${el.tipologia} - Vetro ${el.tipo_vetro}` : ''}
                           {el.categoria !== 'termico' && el.categoria !== 'infissi' ? el.label : ''}
                         </p>
                         <p className="font-bold mt-2 uppercase">
                           <span className="text-black bg-green-500 px-2 py-1 mr-3">{el.categoria}</span>
-                          {el.categoria === 'termico' && el.sotto_categoria === 'radiatore' ? `N. ${el.numero_elementi} EL. | ${el.carico_totale_w} W` : ''}
-                          {el.categoria === 'termico' && el.sotto_categoria === 'split' ? `${el.carico_totale_w} W` : ''}
+                          {el.categoria === 'termico' ? renderTermicoStats(el) : ''}
                           {el.categoria === 'infissi' ? `Q.TA: ${el.quantita}` : ''}
                           {el.categoria !== 'termico' && el.categoria !== 'infissi' ? `Q.TA: ${el.quantita} | ${el.carico_totale_w} W` : ''}
                         </p>
