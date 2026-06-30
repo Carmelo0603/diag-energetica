@@ -2,53 +2,80 @@ import { db } from '../db/database';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
-// (MANTIENI INTACTE LE COSTANTI REQUISITI_ILLUMINOTECNICI, STATO_DI_FATTO, PROGETTO_LUCI CHE HAI GIA')
+// AGGIORNATI CON I NUOVI FILE (Piano assente qui, come da file)
 const REQUISITI_ILLUMINOTECNICI = [
-  ["Piano", "Ambiente / Attività", "Illuminamento Medio Mantenuto (Em - lux)", "Limite di Abbagliamento (UGRL)", "Indice Resa Cromatica Minima (Ra)", "Riferimento Normativo Principale", "Note di Progetto / Prescrizioni"],
-  ["-", "Aule d'infanzia / Asili nido", 300, 19, 80, "UNI EN 12464-1:2021", "Evitare abbagliamento diretto sui tappeti di gioco."],
-  ["-", "Aule di lezione diurne (Scuole di ogni ordine e grado)", 300, 19, 80, "UNI EN 12464-1:2021 / UNI 10840", "Illuminamento sul piano di lavoro orizzontale (h = 0,85 m)."],
-  ["-", "Aule per corsi serali e istruzione adults", 500, 19, 80, "UNI EN 12464-1:2021", "Livello incrementato per compensare la mancanza di luce naturale."],
-  ["-", "Aule di disegno tecnico", 750, 16, 80, "UNI EN 12464-1:2021 / UNI 10840", "Requisito stringente sull'abbagliamento (UGR max 16)."],
-  ["-", "Aule di disegno e arte (Scuole d'arte)", 500, 19, 90, "UNI EN 12464-1:2021", "Ra minimo 90 per garantire la corretta percezione del colore."]
+  ["Tabella Requisiti Illuminotecnici — Edifici Scolastici", "", "", "", "", ""],
+  ["Ambiente / Attività", "Illuminamento Medio Mantenuto (Em - lux)", "Limite di Abbagliamento (UGRL)", "Indice Resa Cromatica Minima (Ra)", "Riferimento Normativo Principale", "Note di Progetto / Prescrizioni"],
+  ["Aule d'infanzia / Asili nido", 300, 19, 80, "UNI EN 12464-1:2021", "Evitare abbagliamento diretto sui tappeti di gioco."],
+  ["Aule di lezione diurne (Scuole di ogni ordine e grado)", 300, 19, 80, "UNI EN 12464-1:2021 / UNI 10840", "Illuminamento sul piano di lavoro orizzontale (h = 0,85 m)."],
+  ["Aule per corsi serali e istruzione adulti", 500, 19, 80, "UNI EN 12464-1:2021", "Livello incrementato per compensare la mancanza di luce naturale."],
+  ["Aule di disegno tecnico", 750, 16, 80, "UNI EN 12464-1:2021 / UNI 10840", "Requisito stringente sull'abbagliamento (UGR max 16)."],
+  ["Aule di disegno e arte (Scuole d'arte)", 500, 19, 90, "UNI EN 12464-1:2021", "Ra minimo 90 per garantire la corretta percezione del colore."],
+  ["Laboratori scientifici e officine", 500, 19, 80, "UNI EN 12464-1:2021", "Prestare attenzione ai riflessi su schermi e superfici lucide."],
+  ["Sale musica e aule di pratica musicale", 300, 18, 80, "UNI EN 12464-1:2021", "UGR massimo restrittivo (18) per agevolare la lettura del pentagramma."],
+  ["Biblioteche: sale di lettura", 500, 19, 80, "UNI EN 12464-1:2021", "Illuminamento sul piano orizzontale di lettura."],
+  ["Biblioteche: zone scaffalature", 200, 19, 80, "UNI EN 12464-1:2021", "Valore sui piani verticali dei dorsi dei libri."],
+  ["Palestre e campi da gioco interni", 300, 22, 80, "UNI EN 12464-1:2021 / EN 12193", "Per competizioni agonistiche fare riferimento alla EN 12193 (fino a 500 lx)."],
+  ["Atri, ingressi principali e zone accoglienza", 200, 22, 80, "UNI EN 12464-1:2021", "Zona di transizione per l'adattamento visivo tra esterno e interno."],
+  ["Corridoi e aree di circolazione generali", 100, 25, 80, "UNI EN 12464-1:2021", "Misurato a livello del pavimento. Elevabile a 150 lx in caso di percorsi critici."],
+  ["Scale, rampe e passaggi pedonali", 150, 25, 80, "UNI EN 12464-1:2021", "Garantire un contrasto visivo sufficiente sui gradini."]
 ];
 
 const STATO_DI_FATTO = [
-  ["Piano", "CATEGORIA", "POTENZA LAMPADA (W)", "PERDITE ALIMENTATORE (W)", "POTENZA REALE ASSORBITA (W)", "FLUSSO LUMINOSO NOMINALE (lm)"],
-  ["-", "Tubo Fluorescente T8 60 cm / G13", 18, "4 (Ferromagnetico)", 22, 1350],
-  ["-", "Tubo Fluorescente T8 90 cm / G13", 30, "6 (Ferromagnetico)", 36, 2400],
-  ["-", "Tubo Fluorescente T8 120 cm / G13", 36, "8 (Ferromagnetico)", 44, 3350],
-  ["-", "Fluorescente Compatta (CFL) Spirale-Globo / E27", 23, "0 (Elettronico integrato)", 23, 1450],
-  ["-", "Fluorescente Compatta Pro PL-C Pin / G24q-3", 26, "3 (Elettronico standard)", 29, 1800],
-  ["-", "Faretto Incasso Alogeno Dicroico / GU5.3 (12V)", 50, "7 (Trasformatore ferreo)", 57, 680],
-  ["-", "Faretto Incasso Alogeno Dicroico / GU10 (230V)", 50, "0 (Alimentazione diretta)", 50, 700],
-  ["-", "Faretto Incasso Ioduri Met. Proiettore / Rx7s", 70, "12 (Ferromagnetico)", 82, 6000],
-  ["-", "Faretto con lampada alogena 20 W", 20, "0 (Alimentazione diretta)", 20, 200],
-  ["-", "Pannello LED 60x60 cm (o 30x120) Entry Level / Retail", 36, "0", 36, 3600],
-  ["-", "faretto led da incasso rotondo", 10, "0", 10, 1200]
+  ["CATEGORIA", "POTENZA LAMPADA (W)", "PERDITE ALIMENTATORE (W)", "POTENZA REALE ASSORBITA (W)", "FLUSSO LUMINOSO NOMINALE (lm)"],
+  ["Applique LED da parete per uscite di sicurezza", 12, "", "", 1000],
+  ["Applique a parete a neon 30W + reattore", 38, "", "", 2400],
+  ["Faretto LED da incasso / Downlight", 18, "", "", 1600],
+  ["Lampada d'emergenza LED (In fase di ricarica costante)", 5, "", "", 300],
+  ["Lampada LED industriale a sospensione / Campana (Per palestre)", 100, "", "", 13000],
+  ["Plafoniera LED rettangolare 120x30 cm", 40, "", "", 4000],
+  ["Plafoniera LED rettangolare 60x60 cm", 36, "", "", 3600],
+  ["Plafoniera stagna LED per corridoi e servizi", 30, "", "", 3300],
+  ["Proiettore LED da esterno per cortili o accessi", 50, "", "", 5500],
+  ["Tubo fluorescente neon da 120 cm (Standard T8) + reattore", 45, "", "", 3000],
+  ["Tubo fluorescente neon da 60 cm (Standard T8) + reattore", 23, "", "", 1350]
 ];
 
 const PROGETTO_LUCI = [
-  ["Piano", "TIPOLOGIA APPARECCHIO", "POTENZA NOMINALE (W)", "FLUSSO LUMINOSO (lm)", "EFFICIENZA LUMINOSA (lm/W)", "COMPATIBILITÀ / NOTE TECNICHE"],
-  ["-", "Pannello LED 60x60 cm (o 30x120) Entry Level / Retail", 36, 3600, 100, "Di solito UGR <22. Va bene per i corridoi, non per le aule."],
-  ["-", "Pannello LED 60x60 cm (o 30x120) Office Professional", 28, 3400, 121, "Standard d'ufficio, solitamente accoppiato a driver UGR <19."],
-  ["-", "Pannello LED 60x60 cm (o 30x120) Pro High-Output", 40, 4500, 112, "Spinge sui lumen se hai interassi larghi tra i punti luce."],
-  ["-", "Pannello LED 60x60 cm (o 30x120) Top Efficiency (Classe A)", 24, 5040, 210, "Chip di ultima generazione. Costano il doppio, ma TerMus ringrazia."],
-  ["-", "Pannello LED 60x60 cm (o 30x120) Industrial High-Flux", 48, 6700, 140, "Quelli della mia proposta esagerata precedente per i 500 lux."],
-  ["-", "Tubo LED T8 60 cm (Attacco G13) Standard Output (SO)", 8, 800, 100, "Sostituisce il vecchio 18W fluorescente. Economico, ma fa poca luce."],
-  ["-", "Tubo LED T8 60 cm (Attacco G13) High Output (HO)", 7.6, 1150, 151, "Ottimo compromesso per relamping di qualità."],
-  ["-", "Tubo LED T8 60 cm (Attacco G13) Ultra Output (UO)", 8.4, 1350, 160, "Il top di gamma per il 60 cm. Pareggia il flusso del neon tradizionale nuovo."],
-  ["-", "Tubo LED T8 120 cm (Attacco G13) Standard Output (SO)", 15, 1800, 120, "Sostituisce il vecchio 36W fluorescente. Versione low-cost."],
-  ["-", "Tubo LED T8 120 cm (Attacco G13) High Output (HO)", 18, 2000, 111, "Il tubo più venduto in assoluto per gli uffici e i laboratori."],
-  ["-", "Tubo LED T8 120 cm (Attacco G13) Ultra Output (UO)", 15.9, 2550, 160, "Prestazioni elevate. Riduce il carico termico complessivo."],
-  ["-", "Tubo LED T8 120 cm (Attacco G13) Ultra Output Premium", 18, 3330, 185, "Flusso massiccio, specifico per uffici ad alta densità o soffitti alti."],
-  ["-", "Lampada LED E27 Goccia/Sfera (Standard)", 11, 1055, 96, "Sostituzione diretta per le vecchie compatte a spirale."],
-  ["-", "Lampada LED E27 Goccia/Sfera (High Lumen)", 15, 1521, 101, "Quando la vecchia plafoniera richiede più spinta."],
-  ["-", "Faretto LED GU5.3 / MR16 (12V)", 5, 345, 69, "Occhio ai trasformatori esistenti, a volte creano sfarfallio (flicker)."],
-  ["-", "Faretto LED GU10 (230V)", 5, 395, 79, "La soluzione migliore per rimpiazzare l'alogeno. Tensione di rete diretta."],
-  ["-", "Faretto LED GU10 (230V) High-Output", 7, 575, 82, "Se l'alogeno di partenza era un 50W bello pompato."],
-  ["-", "Lampada LED Rx7s (Ioduri metallici replacement)", 15, 1800, 120, "Sostituisce il vecchio proiettore da 70W. Va rimosso il reattore/accenditore."],
-  ["-", "Faretto LED rotondo da incasso (Downlight) 10W", 10, 1200, 120, "Spesso usati nei bagni o corridoi controsoffittati."]
+  ["TIPOLOGIA APPARECCHIO", "POTENZA NOMINALE (W)", "FLUSSO LUMINOSO (lm)", "EFFICIENZA LUMINOSA (lm/W)", "modello/produttore"],
+  ["Pannello LED 60x60 3400 lm", 28, 3400, 121, "Noxion LED Panel Ecowhite V4.0 28W 3400lm 4000K 600X600 UGR<19"],
+  ["Pannello LED 60x60 3600 lm", 36, 3600, 121, "White label LED Panel V2 Backlit 36W 3600lm 6500K 600X600 UGR22"],
+  ["Pannello LED 60x60 4300 lm", 31, 4300, 130, "PHILIPS - Modello CoreLine Panel RC132V. Flusso maggiorato."],
+  ["Pannello LED 60x60 4815 lm", 30, 4815, 210, "Interlight Thinq Next+ led paneel 30W UGR<19"],
+  ["Pannello LED 30x120 3360 lm", 28, 3360, 140, "Noxion LED Panel Ecowhite V4.0 28W"],
+  ["Tubo LED T8 120 cm (Attacco G13) 3500 lm", 29, 3500, 120, "Ledvance Tubo LED T8 EM Value Ultra Output 29W 3500lm"],
+  ["Tubo LED T8 150 cm (Attacco G13) 4100 lm", 22.1, 4100, 186, "Noxion Avant LEDtube T8 Ultra Output UE 1500 22.1W"],
+  ["Faretto LED GU4 MR11 (Spot 35mm) - dicroico 184 lm", 2.3, 184, 80, "PHILIPS - Modello CorePro LEDspot LV."],
+  ["Faretto LED GU10 / MR16 (Spot 50mm) 550 lm", 4.9, 550, 112, "LEDVANCE (OSRAM) - Modello Performance LED SPOT GU10."]
 ];
+
+// Funzione Core che calcola autonomamente la lampada e le quantità ottimali
+function calcolaProgettoMigliore(luxNormativi, mq, puntiLuce) {
+  if (!luxNormativi || !mq || !puntiLuce) return { tipo: "", qty: "" };
+
+  const reqLumenTot = (luxNormativi * mq) / 0.375;
+  const reqLumenPerPunto = reqLumenTot / puntiLuce;
+
+  const lampadeDisponibili = PROGETTO_LUCI.slice(1).map(row => ({
+    nome: row[0],
+    lumen: row[2]
+  })).filter(l => typeof l.lumen === 'number' && l.lumen > 0)
+      .sort((a, b) => a.lumen - b.lumen);
+
+  if (lampadeDisponibili.length === 0) return { tipo: "", qty: "" };
+
+  for (let qty = 1; qty <= 6; qty++) {
+    for (let lamp of lampadeDisponibili) {
+      if ((lamp.lumen * qty) >= reqLumenPerPunto) {
+        return { tipo: lamp.nome, qty: qty };
+      }
+    }
+  }
+
+  const lampadaMax = lampadeDisponibili[lampadeDisponibili.length - 1];
+  return { tipo: lampadaMax.nome, qty: 6 };
+}
+
 
 export async function esportaRilievoExcel(idEdificio, tipoExport) {
   try {
@@ -81,91 +108,103 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
     const isTermi = isTutto || tipoExport === 'termico';
     const isInfis = isTutto || tipoExport === 'infissi';
     const isAppar = isTutto || tipoExport === 'apparecchi';
+    const isElettrico = isTutto || tipoExport === 'elettrico';
 
-    // --- ILLUMINAZIONE (INTATTO) ---
+    // --- ILLUMINAZIONE ---
     if (isIllum) {
-      const wsConfronto = preparaFoglioConIntestazione('scheda confronto', 21);
+      const wsConfronto = preparaFoglioConIntestazione('CALCOLO ILLUMINAZIONE', 25);
 
       wsConfronto.mergeCells('A3:M3');
-      wsConfronto.getCell('A3').value = 'STATO DI FATTO';
+      wsConfronto.getCell('A3').value = 'Stato di fatto';
       wsConfronto.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
       wsConfronto.getCell('A3').font = { bold: true };
 
-      wsConfronto.mergeCells('O3:U3');
-      wsConfronto.getCell('O3').value = 'PROGETTO';
+      wsConfronto.mergeCells('O3:Y3');
+      wsConfronto.getCell('O3').value = 'Progetto';
       wsConfronto.getCell('O3').alignment = { horizontal: 'center', vertical: 'middle' };
       wsConfronto.getCell('O3').font = { bold: true };
 
-      wsConfronto.getCell('B4').value = 'dati da rilievo';
-      wsConfronto.getCell('O4').value = 'Progetto';
-
       const headerRow = [
-        "Piano", "Ambiente/Attività", "Illuminamento Medio Mantenuto (Em - lux)", "Sup. mq", "Tipo", "N. Punti luce", "lampade per punto luce", "Quant.", "Watt/cad", "watt tot.", "lumen cad", "lumen tot", "lux stato di fatto",
+        "Piano", "Ambiente/Attività", "Illuminamento Medio lux", "Sup. mq", "Tipo", "N. Punti luce", "lampade per punto luce", "Tot. Lampade", "Watt/cad", "watt tot.", "lumen cad", "lumen tot", "lux tot. stato di fatto",
         "",
-        "Tipo", "Quant.", "Watt/cad", "watt tot.", "lumen cad", "lumen tot", "lux previsti progetto"
+        "Tipo", "N. Punti luce", "lampade per punto luce", "Tot. lampade progetto", "Watt/cad", "watt tot.", "lumen cad", "Lumen totali", "Lux totali PROGETTO", "Verifica", "lux previsti da norma"
       ];
       wsConfronto.addRow(headerRow);
-      wsConfronto.getRow(5).font = { bold: true };
+      wsConfronto.getRow(4).font = { bold: true };
 
-      let startRow = 6;
-      let lastAmbIllum = null;
+      let startRow = 5;
 
       ambienti.forEach(ambiente => {
         let hasIllum = ambiente.elementi_inseriti?.some(el => el.categoria === 'illuminazione');
 
         if (hasIllum) {
-          if (lastAmbIllum !== null && lastAmbIllum !== ambiente.nome) {
-            wsConfronto.addRow([]);
-            startRow++;
-          }
-          lastAmbIllum = ambiente.nome;
-
           ambiente.elementi_inseriti.forEach(el => {
             if (el.categoria === 'illuminazione') {
-              let luxFatto = "";
-              if (el.lumen_tot && ambiente.mq && ambiente.mq > 0) {
-                luxFatto = Math.round((el.lumen_tot * 0.5 * 0.75) / ambiente.mq);
-              }
+              const luxNorm = ambiente.lux_normativi ? Math.round(ambiente.lux_normativi) : "";
+              const pLuce = el.punti_luce ? Math.round(el.punti_luce) : 1;
 
-              const rowData = [
-                ambiente.piano || "", ambiente.nome, ambiente.lux_normativi ? Math.round(ambiente.lux_normativi) : "", ambiente.mq || "", el.label, el.punti_luce ? Math.round(el.punti_luce) : 1, el.lampade_per_punto ? Math.round(el.lampade_per_punto) : 1, el.quantita ? Math.round(el.quantita) : "", el.watt_unitario ? Math.round(el.watt_unitario) : "", el.carico_totale_w ? Math.round(el.carico_totale_w) : "", el.lumen_cad ? Math.round(el.lumen_cad) : "", el.lumen_tot ? Math.round(el.lumen_tot) : "", luxFatto, "", "", "", "", "", "", "", ""
-              ];
-              wsConfronto.addRow(rowData);
+              const { tipo: tipoProg, qty: qtyProg } = calcolaProgettoMigliore(luxNorm, ambiente.mq, pLuce);
 
               const rIdx = startRow;
-              wsConfronto.getCell(`U${rIdx}`).value = { formula: `IF(ISBLANK(C${rIdx}),"",ROUND(C${rIdx},0))` };
-              wsConfronto.getCell(`T${rIdx}`).value = { formula: `IF(OR(ISBLANK(U${rIdx}),ISBLANK(D${rIdx})),"",ROUND((U${rIdx}*D${rIdx})/0.35,0))` };
-              wsConfronto.getCell(`S${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",ROUND(VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$B$4:$F$100,3,FALSE),0))` };
-              wsConfronto.getCell(`Q${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",ROUND(VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$B$4:$F$100,2,FALSE),0))` };
-              wsConfronto.getCell(`P${rIdx}`).value = { formula: `IF(OR(ISBLANK(T${rIdx}),ISBLANK(S${rIdx}),S${rIdx}=0),"",ROUND(T${rIdx}/S${rIdx},0))` };
-              wsConfronto.getCell(`R${rIdx}`).value = { formula: `IF(OR(ISBLANK(P${rIdx}),ISBLANK(Q${rIdx})),"",ROUND(P${rIdx}*Q${rIdx},0))` };
 
-              wsConfronto.getCell(`O${rIdx}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['\'ILLUMINAZ PROGETTO\'!$B$4:$B$100'] };
+              wsConfronto.getCell(`A${rIdx}`).value = ambiente.piano || "-";
+              wsConfronto.getCell(`B${rIdx}`).value = ambiente.nome;
+              wsConfronto.getCell(`C${rIdx}`).value = luxNorm;
+              wsConfronto.getCell(`D${rIdx}`).value = ambiente.mq || "";
+              wsConfronto.getCell(`E${rIdx}`).value = el.label;
+              wsConfronto.getCell(`F${rIdx}`).value = pLuce;
+              wsConfronto.getCell(`G${rIdx}`).value = el.lampade_per_punto ? Math.round(el.lampade_per_punto) : 1;
+              wsConfronto.getCell(`H${rIdx}`).value = { formula: `F${rIdx}*G${rIdx}` };
+              wsConfronto.getCell(`I${rIdx}`).value = el.watt_unitario ? Math.round(el.watt_unitario) : "";
+              wsConfronto.getCell(`J${rIdx}`).value = { formula: `H${rIdx}*I${rIdx}` };
+              wsConfronto.getCell(`K${rIdx}`).value = el.lumen_cad ? Math.round(el.lumen_cad) : "";
+              wsConfronto.getCell(`L${rIdx}`).value = { formula: `H${rIdx}*K${rIdx}` };
+              wsConfronto.getCell(`M${rIdx}`).value = { formula: `IF(ISBLANK(D${rIdx}),"",ROUND((L${rIdx}*0.375)/D${rIdx},0))` };
+
+              wsConfronto.getCell(`N${rIdx}`).value = "";
+
+              wsConfronto.getCell(`O${rIdx}`).value = tipoProg;
+              wsConfronto.getCell(`O${rIdx}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['\'ILLUMINAZ PROGETTO\'!$A$2:$A$100'] };
+
+              wsConfronto.getCell(`P${rIdx}`).value = { formula: `F${rIdx}` };
+              wsConfronto.getCell(`Q${rIdx}`).value = qtyProg;
+              wsConfronto.getCell(`R${rIdx}`).value = { formula: `P${rIdx}*Q${rIdx}` };
+              wsConfronto.getCell(`S${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$A$2:$E$100,2,FALSE))` };
+              wsConfronto.getCell(`T${rIdx}`).value = { formula: `IF(ISBLANK(S${rIdx}),"",R${rIdx}*S${rIdx})` };
+              wsConfronto.getCell(`U${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$A$2:$E$100,3,FALSE))` };
+              wsConfronto.getCell(`V${rIdx}`).value = { formula: `IF(ISBLANK(U${rIdx}),"",R${rIdx}*U${rIdx})` };
+              wsConfronto.getCell(`W${rIdx}`).value = { formula: `IF(OR(ISBLANK(D${rIdx}),ISBLANK(V${rIdx})),"",ROUND((V${rIdx}*0.375)/D${rIdx},0))` };
+              wsConfronto.getCell(`X${rIdx}`).value = { formula: `IF(ISBLANK(W${rIdx}),"",IF(W${rIdx}>=Y${rIdx},"OK","NO"))` };
+              wsConfronto.getCell(`Y${rIdx}`).value = { formula: `C${rIdx}` };
+
               startRow++;
             }
           });
         }
       });
 
-      wsConfronto.getColumn('A').width = 15;
       wsConfronto.getColumn('B').width = 25;
-      wsConfronto.getColumn('E').width = 30;
-      wsConfronto.getColumn('O').width = 30;
+      wsConfronto.getColumn('E').width = 40;
+      wsConfronto.getColumn('O').width = 40;
 
-      const wsReq = preparaFoglioConIntestazione('REQUISITI ILLUMINOTECNICI', 7);
-      REQUISITI_ILLUMINOTECNICI.forEach(r => wsReq.addRow(r));
-      wsReq.getRow(3).font = { bold: true };
-      wsReq.getColumn('B').width = 40;
+      const wsReq = preparaFoglioConIntestazione('REQUISITI ILLUMINOTECNICI', 6);
+      REQUISITI_ILLUMINOTECNICI.forEach((r, idx) => {
+        wsReq.addRow(r);
+        if(idx === 0) wsReq.mergeCells(`A${wsReq.rowCount}:F${wsReq.rowCount}`);
+      });
+      wsReq.getRow(3).font = { bold: true, size: 12 };
+      wsReq.getRow(4).font = { bold: true };
+      wsReq.getColumn('A').width = 40;
 
-      const wsStato = preparaFoglioConIntestazione('ILLUMINAZIONE STATO DI FATTO', 6);
+      const wsStato = preparaFoglioConIntestazione('ILLUMINAZIONE STATO DI FATTO', 5);
       STATO_DI_FATTO.forEach(r => wsStato.addRow(r));
       wsStato.getRow(3).font = { bold: true };
-      wsStato.getColumn('B').width = 50;
+      wsStato.getColumn('A').width = 50;
 
-      const wsProgLuci = preparaFoglioConIntestazione('ILLUMINAZ PROGETTO', 6);
+      const wsProgLuci = preparaFoglioConIntestazione('ILLUMINAZ PROGETTO', 5);
       PROGETTO_LUCI.forEach(r => wsProgLuci.addRow(r));
       wsProgLuci.getRow(3).font = { bold: true };
-      wsProgLuci.getColumn('B').width = 60;
+      wsProgLuci.getColumn('A').width = 60;
 
       const wsVani = preparaFoglioConIntestazione('Aree Nette Vani', 3);
       wsVani.addRow(['Piano', 'VANI', 'Area netta [m²]']);
@@ -175,7 +214,7 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsVani.getColumn('B').width = 35;
     }
 
-    // --- INFISSI (INTATTO) ---
+    // --- INFISSI ---
     if (isInfis) {
       const wsInfissi = preparaFoglioConIntestazione('Infissi', 6);
       wsInfissi.addRow(["Piano", "Ambiente", "Tipologia Telaio", "Tipo Vetro", "Quantità", "Note / Dimensioni"]);
@@ -200,7 +239,7 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsInfissi.getColumn('D').width = 30;
     }
 
-    // --- TERMICO (AGGIORNATO CON FANCOIL, CANALIZZATO E RADIANTI) ---
+    // --- TERMICO ---
     if (isTermi) {
       const wsTermicoRad = preparaFoglioConIntestazione('Termico - Radiatori', 8);
       wsTermicoRad.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt Unitario", "Elementi", "Carico Totale W", "Note"]);
@@ -274,7 +313,6 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
         });
       });
 
-      // Totali Finali (se ci sono elementi)
       if (countRad > 0) {
         wsTermicoRad.addRow([]);
         wsTermicoRad.addRow(["TOTALE GENERALE", "", `N. Radiatori: ${countRad}`, "", "", `Tot. Elementi: ${totElemRad}`, totWRad, ""]);
@@ -294,7 +332,7 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsSoffittoRad.getColumn('B').width = 25; wsSoffittoRad.getColumn('C').width = 25; wsSoffittoRad.getColumn('D').width = 25;
     }
 
-    // --- APPARECCHIATURE (INTATTO) ---
+    // --- APPARECCHIATURE ---
     if (isAppar) {
       const wsApparecchi = preparaFoglioConIntestazione('Apparecchiature', 7);
       wsApparecchi.addRow(["Piano", "Ambiente", "Dettaglio Apparecchio", "Watt Unitario", "Quantità", "Carico Totale W", "Note"]);
@@ -323,16 +361,92 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsApparecchi.getColumn('C').width = 35;
     }
 
+    // --- RIEPILOGHI ELETTRICI (Fatto & Progetto) ---
+    if (isElettrico) {
+      // 1. Foglio STATO DI FATTO
+      const wsRiepilogoFatto = preparaFoglioConIntestazione('Riep. elettrico Stato di fatto', 5);
+      wsRiepilogoFatto.addRow(["Piano", "Ambiente", "Totale Watt Illuminazione", "Totale Watt Apparecchi", "Potenza Elettrica Totale (W)"]);
+      wsRiepilogoFatto.getRow(3).font = { bold: true };
+
+      // 2. Foglio STATO DI PROGETTO (Troncato a 27 caratteri per limite di sistema)
+      const wsRiepilogoProg = preparaFoglioConIntestazione('Riep. elettrico Stato Prog.', 5);
+      wsRiepilogoProg.addRow(["Piano", "Ambiente", "Totale Watt Illum. Progetto", "Totale Watt Apparecchi", "Potenza Elettrica Totale (W)"]);
+      wsRiepilogoProg.getRow(3).font = { bold: true };
+
+      let granTotaleIllumFatto = 0;
+      let granTotaleIllumProg = 0;
+      let granTotaleAppar = 0;
+
+      ambienti.forEach(amb => {
+        let sumIllumFatto = 0;
+        let sumIllumProg = 0;
+        let sumAppar = 0;
+
+        amb.elementi_inseriti?.forEach(el => {
+          if (el.categoria === 'illuminazione') {
+            // Stato di Fatto
+            sumIllumFatto += Math.round(el.carico_totale_w || 0);
+
+            // Ricalcolo al volo i Watt del Progetto
+            const luxNorm = amb.lux_normativi ? Math.round(amb.lux_normativi) : 0;
+            const pLuce = el.punti_luce ? Math.round(el.punti_luce) : 1;
+            const { tipo: tipoProg, qty: qtyProg } = calcolaProgettoMigliore(luxNorm, amb.mq, pLuce);
+
+            // Trovo il wattaggio nominale della lampada trovata dal calcolo automatico
+            const lampadaTrovata = PROGETTO_LUCI.find(r => r[0] === tipoProg);
+            const wattCadProg = lampadaTrovata ? lampadaTrovata[1] : 0;
+
+            sumIllumProg += Math.round(pLuce * qtyProg * wattCadProg);
+
+          } else if (el.categoria === 'apparecchio') {
+            sumAppar += Math.round(el.carico_totale_w || 0);
+          }
+        });
+
+        // Mostro l'ambiente se ha carichi registrati (sia nel fatto che nel progetto)
+        if (sumIllumFatto > 0 || sumAppar > 0 || sumIllumProg > 0) {
+          wsRiepilogoFatto.addRow([amb.piano || "", amb.nome, sumIllumFatto, sumAppar, sumIllumFatto + sumAppar]);
+          wsRiepilogoProg.addRow([amb.piano || "", amb.nome, sumIllumProg, sumAppar, sumIllumProg + sumAppar]);
+
+          granTotaleIllumFatto += sumIllumFatto;
+          granTotaleIllumProg += sumIllumProg;
+          granTotaleAppar += sumAppar;
+        }
+      });
+
+      // Totali Fatto
+      wsRiepilogoFatto.addRow([]);
+      wsRiepilogoFatto.addRow(["TOTALE GENERALE", "", granTotaleIllumFatto, granTotaleAppar, granTotaleIllumFatto + granTotaleAppar]);
+      wsRiepilogoFatto.getRow(wsRiepilogoFatto.rowCount).font = { bold: true };
+
+      wsRiepilogoFatto.getColumn('B').width = 30;
+      wsRiepilogoFatto.getColumn('C').width = 25;
+      wsRiepilogoFatto.getColumn('D').width = 25;
+      wsRiepilogoFatto.getColumn('E').width = 30;
+
+      // Totali Progetto
+      wsRiepilogoProg.addRow([]);
+      wsRiepilogoProg.addRow(["TOTALE GENERALE", "", granTotaleIllumProg, granTotaleAppar, granTotaleIllumProg + granTotaleAppar]);
+      wsRiepilogoProg.getRow(wsRiepilogoProg.rowCount).font = { bold: true };
+
+      wsRiepilogoProg.getColumn('B').width = 30;
+      wsRiepilogoProg.getColumn('C').width = 30;
+      wsRiepilogoProg.getColumn('D').width = 25;
+      wsRiepilogoProg.getColumn('E').width = 30;
+    }
+
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
     let suffisso = tipoExport.toUpperCase();
     if (tipoExport === 'tutto') suffisso = 'COMPLETO';
+    if (tipoExport === 'elettrico') suffisso = 'RIEPILOGO_ELETTRICO';
 
     const nomeFile = `Rilievo_${edificio.nome.replace(/\s+/g, '_')}_${suffisso}.xlsx`;
     saveAs(blob, nomeFile);
 
   } catch (error) {
-    alert("Errore nell'esportazione excel.");
+    alert("Errore nell'esportazione excel. Controlla la console.");
+    console.error(error);
   }
 }
