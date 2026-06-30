@@ -4,12 +4,17 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db/database";
 
 const ASSET_LUCI = [
-  { id: "t8_60", label: "Tubo Fluorescente T8 60cm", watt: 18, lumen: 1350, tipo: "luci", categoria: "illuminazione" },
-  { id: "t8_90", label: "Tubo Fluorescente T8 90cm", watt: 30, lumen: 2400, tipo: "luci", categoria: "illuminazione" },
-  { id: "t8_120", label: "Tubo Fluorescente T8 120cm", watt: 36, lumen: 3350, tipo: "luci", categoria: "illuminazione" },
-  { id: "cfl_e27", label: "CFL Spirale/Globo E27", watt: 23, lumen: 1450, tipo: "luci", categoria: "illuminazione" },
-  { id: "cfl_plc", label: "CFL Pro PL-C Pin G24q", watt: 26, lumen: 1800, tipo: "luci", categoria: "illuminazione" },
-  { id: "alo_gu53", label: "Faretto Alogeno Dicroico GU5.3", watt: 50, lumen: 680, tipo: "luci", categoria: "illuminazione" },
+  { id: "t8_60", label: "Applique LED da parete per uscite di sicurezza", watt: 12, lumen: 1000, tipo: "luci", categoria: "illuminazione" },
+  { id: "t8_90", label: "Applique a parete a neon 30W + reattore", watt: 38, lumen: 2400, tipo: "luci", categoria: "illuminazione" },
+  { id: "t8_120", label: "Faretto LED da incasso / Downlight", watt: 18, lumen: 1600, tipo: "luci", categoria: "illuminazione" },
+  { id: "cfl_e27", label: "Lampada d'emergenza LED (In fase di ricarica costante)", watt: 5, lumen: 300, tipo: "luci", categoria: "illuminazione" },
+  { id: "cfl_plc", label: "Lampada LED industriale a sospensione / Campana (Per palestre)", watt: 100, lumen: 13000, tipo: "luci", categoria: "illuminazione" },
+  { id: "alo_gu53", label: "Plafoniera LED rettangolare 120x30 cm", watt: 40, lumen: 4000, tipo: "luci", categoria: "illuminazione" },
+  { id: "pla_60cm", label: "Plafoniera LED rettangolare 60x60 cm", watt: 36, lumen: 4000, tipo: "luci", categoria: "illuminazione" },
+  { id: "pla_corridoi", label: "Plafoniera stagna LED per corridoi e servizi", watt: 30, lumen: 3300, tipo: "luci", categoria: "illuminazione" },
+  { id: "pla_estrn", label: "Proiettore LED da esterno per cortili o accessi", watt: 50, lumen: 5500, tipo: "luci", categoria: "illuminazione" },
+  { id: "tb_60cm", label: "Tubo fluorescente neon da 60 cm (Standard T8) + reattore", watt: 23, lumen: 1350, tipo: "luci", categoria: "illuminazione" },
+  { id: "tb_120cm", label: "Tubo fluorescente neon da 120 cm (Standard T8) + reattore", watt: 45, lumen: 3000, tipo: "luci", categoria: "illuminazione" },
 ];
 
 const ASSET_SCUOLE_UFFICI = [
@@ -40,6 +45,10 @@ const ASSET_SCUOLE_UFFICI = [
   { id: "caffe_monete", label: "Macchina caffè a monete", watt: 1500, tipo: "apparecchi", categoria: "apparecchio" },
   { id: "pc_fisso", label: "PC Fisso", watt: 200, tipo: "apparecchi", categoria: "apparecchio" },
   { id: "split", label: "Split Clima", watt: 1000, tipo: "apparecchi", categoria: "climatizzazione" },
+  { id: "scaldacqua", label: "scaldacqua elettrico 20 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua", label: "scaldacqua elettrico 30 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua", label: "scaldacqua elettrico 50 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua", label: "scaldacqua elettrico 80 litri", watt: 1500, tipo: "apparecchi", categoria: "apparecchio" },
 ];
 
 const ASSET_CASA_DI_RIPOSO = [

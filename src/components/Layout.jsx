@@ -5,11 +5,13 @@ import { db } from '../db/database';
 import { Download, ChevronDown } from 'lucide-react';
 import { esportaRilievoExcel } from '../utils/exportExcel';
 import SearchBar from './SearchBar';
+import useSync from "../hooks/useSync.jsx";
 
 export default function Layout() {
     const { idEdificio, idAmbiente } = useParams();
     const location = useLocation();
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
+    useSync();
 
     useEffect(() => {
         setExportMenuOpen(false);
@@ -52,7 +54,9 @@ export default function Layout() {
                                 <button onClick={() => handleExport('illuminazione')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">ILLUMINAZIONE</button>
                                 <button onClick={() => handleExport('termico')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">TERMICO</button>
                                 <button onClick={() => handleExport('infissi')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">INFISSI</button>
-                                <button onClick={() => handleExport('apparecchi')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black transition-none">APPARECCHI</button>
+                                <button onClick={() => handleExport('apparecchi')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black border-b-2 border-zinc-800 transition-none">APPARECCHI</button>
+                                {/* Ti eri perso questo 👇 */}
+                                <button onClick={() => handleExport('elettrico')} className="p-4 text-left font-black uppercase text-sm hover:bg-green-500 hover:text-black transition-none">RIEPILOGO ELETTRICO</button>
                             </div>
                         )}
                     </div>

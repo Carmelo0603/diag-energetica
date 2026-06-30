@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import { NORMATIVA_LUX } from '../data/normativa_lux';
@@ -9,6 +9,7 @@ const PIANI_STANDARD = ['-2', '-1', 'TERRA', '1', '2', '3', '4', '5', '6', '7', 
 
 export default function DettaglioEdificio() {
   const { idEdificio } = useParams();
+  const navigate = useNavigate();
 
   const [pianoStanza, setPianoStanza] = useState('');
   const [customPiano, setCustomPiano] = useState('');
@@ -61,7 +62,8 @@ export default function DettaglioEdificio() {
 
   const handleCreaOAggiornaAmbiente = async (e) => {
     e.preventDefault();
-    if (!destinazioneId || !superficieMq || !pianoStanza) return;
+    // Validazione base: mq non più richiesto
+    if (!destinazioneId || !pianoStanza) return;
 
     let unitaLabel = '';
     if (isCondominio && !isResidenziale && idUnitaSelezionata) {
@@ -72,6 +74,9 @@ export default function DettaglioEdificio() {
     let nomeFinale = '';
     let targetLux = 0;
     const pianoFinale = isCustomPiano ? customPiano.trim().toUpperCase() : pianoStanza;
+
+    // Gestione sicura dei MQ (evita NaN se vuoto)
+    const finalMq = superficieMq ? parseFloat(superficieMq) : '';
 
     if (isCustom) {
       if (!nomeLibero || !customLux) return;
@@ -92,27 +97,32 @@ export default function DettaglioEdificio() {
       await db.ambienti.update(stanzaInModifica.id, {
         nome: nomeFinale,
         piano: pianoFinale,
-        mq: parseFloat(superficieMq),
+        mq: finalMq,
         destinazione_uso_id: destinazioneId,
         lux_normativi: targetLux,
         id_unita: isCondominio && !isResidenziale ? idUnitaSelezionata : ''
       });
       setStanzaInModifica(null);
+      setDestinazioneId(''); setNomeLibero(''); setCustomLux(''); setSuperficieMq(''); setIdUnitaSelezionata(''); setPianoStanza(''); setCustomPiano('');
     } else {
+      // Genero l'ID prima, così posso usarlo per la navigazione
+      const newAmbienteId = `amb_${crypto.randomUUID()}`;
+
       await db.ambienti.add({
-        id: `amb_${crypto.randomUUID()}`,
+        id: newAmbienteId,
         id_edificio: idEdificio,
         nome: nomeFinale,
         piano: pianoFinale,
-        mq: parseFloat(superficieMq),
+        mq: finalMq,
         id_unita: isCondominio && !isResidenziale ? idUnitaSelezionata : '',
         destinazione_uso_id: destinazioneId,
         lux_normativi: targetLux,
         elementi_inseriti: []
       });
-    }
 
-    setDestinazioneId(''); setNomeLibero(''); setCustomLux(''); setSuperficieMq(''); setIdUnitaSelezionata(''); setPianoStanza(''); setCustomPiano('');
+      // Salto diretto dentro la stanza appena creata
+      navigate(`/ambiente/${newAmbienteId}`);
+    }
   };
 
   const caricaModificaStanza = (e, amb) => {
@@ -121,7 +131,7 @@ export default function DettaglioEdificio() {
     setPianoStanza(PIANI_STANDARD.includes(amb.piano) ? amb.piano : 'custom');
     setCustomPiano(PIANI_STANDARD.includes(amb.piano) ? '' : (amb.piano || ''));
     setDestinazioneId(amb.destinazione_uso_id);
-    setSuperficieMq(amb.mq.toString());
+    setSuperficieMq(amb.mq ? amb.mq.toString() : '');
     setIdUnitaSelezionata(amb.id_unita || '');
     if (amb.destinazione_uso_id === 'custom') {
       setCustomLux(amb.lux_normativi.toString());
@@ -239,8 +249,8 @@ export default function DettaglioEdificio() {
               )}
 
               <div className="md:col-span-1">
-                <label className="block text-sm font-bold uppercase mb-2">Superficie (MQ)</label>
-                <input type="number" step="0.01" required value={superficieMq} onChange={(e) => setSuperficieMq(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase" />
+                <label className="block text-sm font-bold uppercase mb-2">Superficie (MQ) - <span className="opacity-50 text-xs">Opzionale</span></label>
+                <input type="number" step="0.01" value={superficieMq} onChange={(e) => setSuperficieMq(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase" />
               </div>
 
               <div className={`md:col-span-${isCustomPiano ? '1' : '2'}`}>
@@ -288,7 +298,7 @@ export default function DettaglioEdificio() {
                       <Link to={`/ambiente/${ambiente.id}`} className="flex-1 block">
                         <h4 className="text-2xl font-black uppercase group-hover:text-green-500">{ambiente.nome}</h4>
                         <p className="font-bold mt-2 uppercase opacity-80 text-zinc-400">
-                          PIANO: {ambiente.piano} | {ambiente.mq} MQ | TARGET: {ambiente.lux_normativi} LUX | ASSET: {ambiente.elementi_inseriti.length}
+                          PIANO: {ambiente.piano} | {ambiente.mq || "NON SPECIFICATO"} | TARGET: {ambiente.lux_normativi} LUX | ASSET: {ambiente.elementi_inseriti.length}
                         </p>
                       </Link>
                       <div className="flex items-center gap-2 justify-end border-t-2 border-dashed sm:border-0 border-zinc-800 pt-3 sm:pt-0">

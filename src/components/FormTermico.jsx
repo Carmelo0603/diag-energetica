@@ -4,10 +4,9 @@ import { DIZIONARIO_RADIATORI } from "../data/dizionario_radiatori";
 export default function FormTermico({ onSalva, initialData = null, onAnnulla = null }) {
   const [tipoTermico, setTipoTermico] = useState("radiatore");
 
-  // Dati Radiatore
+  // Dati Radiatore (Aggiornati al nuovo dizionario)
   const [materiale, setMateriale] = useState("");
   const [interasse, setInterasse] = useState("");
-  const [colonne, setColonne] = useState("");
   const [numeroElementi, setNumeroElementi] = useState(1);
 
   // Dati Split
@@ -35,9 +34,8 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
     if (initialData) {
       setTipoTermico(initialData.sotto_categoria || "radiatore");
       if (initialData.sotto_categoria === "radiatore") {
-        setMateriale(initialData.tipologia || "");
-        setInterasse(initialData.altezza_label || "");
-        setColonne(initialData.colonne || "");
+        setMateriale(initialData.materiale_key || "");
+        setInterasse(initialData.interasse_key || "");
         setNumeroElementi(initialData.numero_elementi || 1);
       } else if (initialData.sotto_categoria === "split") {
         setSplitLabel(initialData.label || "");
@@ -71,23 +69,24 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
     };
 
     if (tipoTermico === "radiatore") {
-      // Radiatore rimane strictly required
       if (!materiale || !interasse) return;
-      let wElem = DIZIONARIO_RADIATORI[materiale]?.rese_termiche[interasse]?.w_elemento || 0;
-      if (materiale === "GHISA" || materiale === "ACCIAIO_TUBOLARE") {
-        wElem = DIZIONARIO_RADIATORI[materiale].rese_termiche[interasse][colonne]?.w_elemento || 0;
-      }
+
+      const matObj = DIZIONARIO_RADIATORI[materiale];
+      const altezzaObj = matObj?.altezze.find(a => a.id === interasse);
+      const wElem = altezzaObj ? altezzaObj.watt_elemento : 0;
+      const labelInterasse = altezzaObj ? altezzaObj.label : interasse;
+
       payload = {
         ...payload,
-        tipologia: materiale,
-        altezza_label: interasse,
-        colonne: colonne,
+        materiale_key: materiale,
+        interasse_key: interasse,
+        tipologia: matObj ? matObj.label : materiale,
+        altezza_label: labelInterasse,
         numero_elementi: parseInt(numeroElementi, 10),
         watt_per_elemento: wElem,
         carico_totale_w: wElem * parseInt(numeroElementi, 10)
       };
     } else if (tipoTermico === "split") {
-      // Split rimane strictly required
       if (!splitLabel || !splitWatt) return;
       payload = {
         ...payload,
@@ -97,7 +96,6 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
         carico_totale_w: parseInt(splitWatt, 10) * parseInt(quantitaSplit, 10)
       };
     } else if (tipoTermico === "fancoil") {
-      // Dati opzionali gestiti per evitare NaN
       payload = {
         ...payload,
         marca: marca || "",
@@ -124,16 +122,16 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
     onSalva(payload);
 
     if (!initialData) {
-      setMateriale(""); setInterasse(""); setColonne(""); setNumeroElementi(1);
+      setMateriale(""); setInterasse(""); setNumeroElementi(1);
       setSplitLabel(""); setSplitWatt(""); setQuantitaSplit(1);
       setMarca(""); setModello(""); setPotenzaRisc(""); setPotenzaRaff(""); setQuantitaFancoil(1);
       setPotenzaMacchina(""); setSuperficie(""); setPassoPosa(""); setNote("");
     }
   };
 
-  const isGhisaOrTubolare = materiale === "GHISA" || materiale === "ACCIAIO_TUBOLARE";
-  const opzioniInterassi = materiale ? Object.keys(DIZIONARIO_RADIATORI[materiale].rese_termiche) : [];
-  const opzioniColonne = isGhisaOrTubolare && interasse ? Object.keys(DIZIONARIO_RADIATORI[materiale].rese_termiche[interasse]) : [];
+  const opzioniInterassi = materiale && DIZIONARIO_RADIATORI[materiale]
+      ? DIZIONARIO_RADIATORI[materiale].altezze
+      : [];
 
   return (
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -159,30 +157,25 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
               <>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Materiale Radiatore</label>
-                  <select value={materiale} onChange={(e) => { setMateriale(e.target.value); setInterasse(""); setColonne(""); }} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold appearance-none rounded-none" required>
+                  <select value={materiale} onChange={(e) => { setMateriale(e.target.value); setInterasse(""); }} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold appearance-none rounded-none" required>
                     <option value="">-- SELEZIONA --</option>
-                    {Object.keys(DIZIONARIO_RADIATORI).map(mat => <option key={mat} value={mat}>{mat.replace("_", " ")}</option>)}
+                    {Object.entries(DIZIONARIO_RADIATORI).map(([key, data]) => (
+                        <option key={key} value={key}>{data.label.toUpperCase()}</option>
+                    ))}
                   </select>
                 </div>
                 {materiale && (
                     <div>
                       <label className="block text-sm font-bold uppercase mb-2">Interasse / Altezza</label>
-                      <select value={interasse} onChange={(e) => { setInterasse(e.target.value); setColonne(""); }} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold appearance-none rounded-none" required>
+                      <select value={interasse} onChange={(e) => setInterasse(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold appearance-none rounded-none" required>
                         <option value="">-- SELEZIONA --</option>
-                        {opzioniInterassi.map(int => <option key={int} value={int}>{int}</option>)}
+                        {opzioniInterassi.map(int => (
+                            <option key={int.id} value={int.id}>{int.label.toUpperCase()}</option>
+                        ))}
                       </select>
                     </div>
                 )}
-                {isGhisaOrTubolare && interasse && (
-                    <div>
-                      <label className="block text-sm font-bold uppercase mb-2">N. Colonne</label>
-                      <select value={colonne} onChange={(e) => setColonne(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold appearance-none rounded-none" required>
-                        <option value="">-- SELEZIONA --</option>
-                        {opzioniColonne.map(col => <option key={col} value={col}>{col} COLONNE</option>)}
-                      </select>
-                    </div>
-                )}
-                <div className={isGhisaOrTubolare && interasse ? "" : "md:col-span-2"}>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-bold uppercase mb-2">Numero Elementi Fisici</label>
                   <input type="number" min="1" value={numeroElementi} onChange={(e) => setNumeroElementi(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
                 </div>
