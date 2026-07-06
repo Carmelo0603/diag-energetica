@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [nomeProgetto, setNomeProgetto] = useState('');
   const [macroCategoria, setMacroCategoria] = useState('');
   const [tipologiaSpecifica, setTipologiaSpecifica] = useState('');
+  const [noteAggiuntive, setNoteAggiuntive] = useState('');
 
   const [edificioInModifica, setEdificioInModifica] = useState(null);
   const [nuovoNomeEdificio, setNuovoNomeEdificio] = useState('');
@@ -31,10 +32,11 @@ export default function Dashboard() {
       tipologia: tipologiaFinale,
       pods: [],
       pdr: '',
+      note: noteAggiuntive.trim(),
       data_creazione: new Date().toISOString(),
     });
 
-    setNomeProgetto(''); setMacroCategoria(''); setTipologiaSpecifica('');
+    setNomeProgetto(''); setMacroCategoria(''); setTipologiaSpecifica(''); setNoteAggiuntive('');
     navigate(`/edificio/${id}`);
   };
 
@@ -111,6 +113,16 @@ export default function Dashboard() {
                     </select>
                   </div>
               )}
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold uppercase mb-2">Note / Info Aggiuntive (Opzionale)</label>
+                <textarea
+                    value={noteAggiuntive}
+                    onChange={(e) => setNoteAggiuntive(e.target.value)}
+                    placeholder="ES. ACCESSO DA VIA ROMA, CHIAVI DAL CUSTODE..."
+                    className="w-full bg-black border-2 border-dashed border-white p-4 text-lg focus:outline-none focus:border-solid focus:border-green-500 text-white min-h-[100px]"
+                />
+              </div>
             </div>
 
             <button
@@ -148,6 +160,7 @@ export default function Dashboard() {
                             <Link to={`/edificio/${edificio.id}`} className="group block">
                               <h3 className="text-2xl font-black uppercase tracking-tighter group-hover:text-green-500">{edificio.nome}</h3>
                               <p className="text-sm font-bold mt-2 uppercase opacity-80 text-zinc-400">{NORMATIVA_LUX[edificio.tipologia]?.label || edificio.tipologia}</p>
+                              {edificio.note && <p className="text-xs font-bold mt-2 text-zinc-500 uppercase border-l-2 border-green-500 pl-2">NOTE: {edificio.note}</p>}
                             </Link>
                         )}
                       </div>

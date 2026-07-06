@@ -7,19 +7,20 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
   // Dati Radiatore (Aggiornati al nuovo dizionario)
   const [materiale, setMateriale] = useState("");
   const [interasse, setInterasse] = useState("");
-  const [numeroElementi, setNumeroElementi] = useState(1);
+  const [numeroElementi, setNumeroElementi] = useState("");
+  const [quantitaRadiatori, setQuantitaRadiatori] = useState("");
 
   // Dati Split
   const [splitLabel, setSplitLabel] = useState("");
   const [splitWatt, setSplitWatt] = useState("");
-  const [quantitaSplit, setQuantitaSplit] = useState(1);
+  const [quantitaSplit, setQuantitaSplit] = useState("");
 
   // Dati Fancoil / Radiante
   const [marca, setMarca] = useState("");
   const [modello, setModello] = useState("");
   const [potenzaRisc, setPotenzaRisc] = useState("");
   const [potenzaRaff, setPotenzaRaff] = useState("");
-  const [quantitaFancoil, setQuantitaFancoil] = useState(1);
+  const [quantitaFancoil, setQuantitaFancoil] = useState("");
 
   // Dati Canalizzato
   const [potenzaMacchina, setPotenzaMacchina] = useState("");
@@ -36,17 +37,18 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
       if (initialData.sotto_categoria === "radiatore") {
         setMateriale(initialData.materiale_key || "");
         setInterasse(initialData.interasse_key || "");
-        setNumeroElementi(initialData.numero_elementi || 1);
+        setNumeroElementi(initialData.numero_elementi || "");
+        setQuantitaRadiatori(initialData.quantita || "");
       } else if (initialData.sotto_categoria === "split") {
         setSplitLabel(initialData.label || "");
         setSplitWatt(initialData.watt_unitario || "");
-        setQuantitaSplit(initialData.quantita || 1);
+        setQuantitaSplit(initialData.quantita || "");
       } else if (initialData.sotto_categoria === "fancoil") {
         setMarca(initialData.marca || "");
         setModello(initialData.modello || "");
         setPotenzaRisc(initialData.potenza_risc || "");
         setPotenzaRaff(initialData.potenza_raff || "");
-        setQuantitaFancoil(initialData.quantita || 1);
+        setQuantitaFancoil(initialData.quantita || "");
       } else if (initialData.sotto_categoria === "canalizzato") {
         setPotenzaMacchina(initialData.potenza_macchina || "");
       } else if (initialData.sotto_categoria === "pavimento_radiante" || initialData.sotto_categoria === "soffitto_radiante") {
@@ -69,12 +71,15 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
     };
 
     if (tipoTermico === "radiatore") {
-      if (!materiale || !interasse) return;
+      if (!materiale || !interasse || !numeroElementi || !quantitaRadiatori) return;
 
       const matObj = DIZIONARIO_RADIATORI[materiale];
       const altezzaObj = matObj?.altezze.find(a => a.id === interasse);
       const wElem = altezzaObj ? altezzaObj.watt_elemento : 0;
       const labelInterasse = altezzaObj ? altezzaObj.label : interasse;
+
+      const numEl = parseInt(numeroElementi, 10);
+      const qRad = parseInt(quantitaRadiatori, 10);
 
       payload = {
         ...payload,
@@ -82,12 +87,13 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
         interasse_key: interasse,
         tipologia: matObj ? matObj.label : materiale,
         altezza_label: labelInterasse,
-        numero_elementi: parseInt(numeroElementi, 10),
+        numero_elementi: numEl,
+        quantita: qRad,
         watt_per_elemento: wElem,
-        carico_totale_w: wElem * parseInt(numeroElementi, 10)
+        carico_totale_w: wElem * numEl * qRad
       };
     } else if (tipoTermico === "split") {
-      if (!splitLabel || !splitWatt) return;
+      if (!splitLabel || !splitWatt || !quantitaSplit) return;
       payload = {
         ...payload,
         label: splitLabel,
@@ -96,13 +102,20 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
         carico_totale_w: parseInt(splitWatt, 10) * parseInt(quantitaSplit, 10)
       };
     } else if (tipoTermico === "fancoil") {
+      if (!quantitaFancoil) return;
+      const q = parseInt(quantitaFancoil, 10);
+      const pRisc = potenzaRisc ? parseFloat(potenzaRisc) : 0;
+      const pRaff = potenzaRaff ? parseFloat(potenzaRaff) : 0;
+
       payload = {
         ...payload,
         marca: marca || "",
         modello: modello || "",
-        potenza_risc: potenzaRisc ? parseInt(potenzaRisc, 10) : "",
-        potenza_raff: potenzaRaff ? parseInt(potenzaRaff, 10) : "",
-        quantita: quantitaFancoil ? parseInt(quantitaFancoil, 10) : 1
+        potenza_risc: pRisc || "",
+        potenza_raff: pRaff || "",
+        quantita: q,
+        totale_potenza_risc: Number((pRisc * q).toFixed(2)),
+        totale_potenza_raff: Number((pRaff * q).toFixed(2))
       };
     } else if (tipoTermico === "canalizzato") {
       payload = {
@@ -122,9 +135,9 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
     onSalva(payload);
 
     if (!initialData) {
-      setMateriale(""); setInterasse(""); setNumeroElementi(1);
-      setSplitLabel(""); setSplitWatt(""); setQuantitaSplit(1);
-      setMarca(""); setModello(""); setPotenzaRisc(""); setPotenzaRaff(""); setQuantitaFancoil(1);
+      setMateriale(""); setInterasse(""); setNumeroElementi(""); setQuantitaRadiatori("");
+      setSplitLabel(""); setSplitWatt(""); setQuantitaSplit("");
+      setMarca(""); setModello(""); setPotenzaRisc(""); setPotenzaRaff(""); setQuantitaFancoil("");
       setPotenzaMacchina(""); setSuperficie(""); setPassoPosa(""); setNote("");
     }
   };
@@ -175,9 +188,13 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
                       </select>
                     </div>
                 )}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold uppercase mb-2">Numero Elementi Fisici</label>
-                  <input type="number" min="1" value={numeroElementi} onChange={(e) => setNumeroElementi(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-bold uppercase mb-2">Elementi per Radiatore</label>
+                  <input type="number" min="1" placeholder="ES. 5" value={numeroElementi} onChange={(e) => setNumeroElementi(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-bold uppercase mb-2">Quantità Radiatori Uguali</label>
+                  <input type="number" min="1" placeholder="ES. 2" value={quantitaRadiatori} onChange={(e) => setQuantitaRadiatori(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
                 </div>
               </>
           )}
@@ -194,7 +211,7 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
                 </div>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Quantità</label>
-                  <input type="number" min="1" value={quantitaSplit} onChange={(e) => setQuantitaSplit(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
+                  <input type="number" min="1" placeholder="ES. 1" value={quantitaSplit} onChange={(e) => setQuantitaSplit(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
                 </div>
               </>
           )}
@@ -211,15 +228,15 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
                 </div>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Potenza Termica Risc. (W)</label>
-                  <input type="number" value={potenzaRisc} onChange={(e) => setPotenzaRisc(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
+                  <input type="number" step="0.01" value={potenzaRisc} onChange={(e) => setPotenzaRisc(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Potenza Termica Raff. (W)</label>
-                  <input type="number" value={potenzaRaff} onChange={(e) => setPotenzaRaff(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
+                  <input type="number" step="0.01" value={potenzaRaff} onChange={(e) => setPotenzaRaff(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold uppercase mb-2">Quantità Fancoil Identici</label>
-                  <input type="number" min="1" value={quantitaFancoil} onChange={(e) => setQuantitaFancoil(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
+                  <input type="number" min="1" placeholder="ES. 1" required value={quantitaFancoil} onChange={(e) => setQuantitaFancoil(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
               </>
           )}

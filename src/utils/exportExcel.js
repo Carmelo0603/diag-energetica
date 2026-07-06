@@ -2,7 +2,6 @@ import { db } from '../db/database';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
-// === NUOVE TABELLE NORMATIVE ===
 const REQUISITI_SCUOLE = [
   ["Tabella Requisiti Illuminotecnici — Edifici Scolastici", "", "", "", "", ""],
   ["Ambiente / Attività", "Illuminamento Medio Mantenuto (Em - lux)", "Limite di Abbagliamento (UGRL)", "Indice Resa Cromatica Minima (Ra)", "Riferimento Normativo Principale", "Note di Progetto / Prescrizioni"],
@@ -161,8 +160,7 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
     const isAppar = isTutto || tipoExport === 'apparecchi';
     const isElettrico = isTutto || tipoExport === 'elettrico';
 
-    // Seleziona la tabella requisiti corretta in base alla categoria dell'edificio
-    let tabellaRequisitiAttiva = REQUISITI_SCUOLE; // Fallback
+    let tabellaRequisitiAttiva = REQUISITI_SCUOLE;
     const macroCat = edificio.macro_categoria?.toLowerCase() || '';
     if (macroCat === 'ufficio') {
       tabellaRequisitiAttiva = REQUISITI_UFFICI;
@@ -248,7 +246,6 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsConfronto.getColumn('E').width = 40;
       wsConfronto.getColumn('O').width = 40;
 
-      // Popola in modo dinamico con la tabella del cantiere corretto
       const wsReq = preparaFoglioConIntestazione('REQUISITI ILLUMINOTECNICI', 6);
       tabellaRequisitiAttiva.forEach((r, idx) => {
         wsReq.addRow(r);
@@ -301,16 +298,58 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
     }
 
     if (isTermi) {
-      const wsTermicoRad = preparaFoglioConIntestazione('Termico - Radiatori', 8);
-      wsTermicoRad.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt Unitario", "Elementi", "Carico Totale W", "Note"]);
+
+      // --- NUOVO FOGLIO: GENERATORI DI CALORE (A livello di Edificio) ---
+      const generatori = edificio.generatori_calore || [];
+      const wsGen = preparaFoglioConIntestazione('Generatori di Calore', 6);
+      wsGen.addRow(["Tipologia", "Vettore Energetico", "Marca / Modello", "Potenza Unit. (kW)", "Q.tà", "Potenza Totale (kW)"]);
+      wsGen.getRow(3).font = { bold: true };
+
+      let totKwGenerale = 0;
+      let totQtaGenerale = 0;
+
+      generatori.forEach(g => {
+        const kw = parseFloat(g.kw) || 0;
+        const q = parseInt(g.quantita, 10) || 1;
+        const totKw = g.totale_kw || Number((kw * q).toFixed(2));
+
+        wsGen.addRow([
+          g.tipo.replace('_', ' ').toUpperCase(),
+          g.vettore.toUpperCase(),
+          g.marca.toUpperCase(),
+          kw,
+          q,
+          totKw
+        ]);
+        totKwGenerale += totKw;
+        totQtaGenerale += q;
+      });
+
+      if (generatori.length > 0) {
+        wsGen.addRow([]);
+        wsGen.addRow(["TOTALE GENERALE", "", "", "", totQtaGenerale, Number(totKwGenerale.toFixed(2))]);
+        wsGen.getRow(wsGen.rowCount).font = { bold: true };
+      }
+
+      wsGen.getColumn('A').width = 25;
+      wsGen.getColumn('B').width = 25;
+      wsGen.getColumn('C').width = 30;
+      wsGen.getColumn('D').width = 20;
+      wsGen.getColumn('E').width = 15;
+      wsGen.getColumn('F').width = 20;
+
+
+      // --- FOGLI TERMICI AMBIENTI ---
+      const wsTermicoRad = preparaFoglioConIntestazione('Termico - Radiatori', 9);
+      wsTermicoRad.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt / Elem.", "Elementi / Rad.", "Q.tà Radiatori", "Carico Totale W", "Note"]);
       wsTermicoRad.getRow(3).font = { bold: true };
 
       const wsTermicoSplit = preparaFoglioConIntestazione('Termico - Split', 8);
       wsTermicoSplit.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt Unitario", "Q.tà", "Carico Totale W", "Note"]);
       wsTermicoSplit.getRow(3).font = { bold: true };
 
-      const wsFancoil = preparaFoglioConIntestazione('Termico - Fancoil', 8);
-      wsFancoil.addRow(["Piano", "Ambiente", "Marca", "Modello", "Pot. Risc. (W)", "Pot. Raff. (W)", "Q.tà", "Note"]);
+      const wsFancoil = preparaFoglioConIntestazione('Termico - Fancoil', 10);
+      wsFancoil.addRow(["Piano", "Ambiente", "Marca", "Modello", "Pot. Risc. Unit. (W)", "Pot. Raff. Unit. (W)", "Q.tà", "Tot. Risc. (W)", "Tot. Raff. (W)", "Note"]);
       wsFancoil.getRow(3).font = { bold: true };
 
       const wsCanalizzato = preparaFoglioConIntestazione('Termico - Canalizzato', 4);
@@ -327,7 +366,10 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
 
       let totWRad = 0; let totElemRad = 0; let countRad = 0; let lastAmbRad = null;
       let totWSplit = 0; let totQSplit = 0; let countSplit = 0; let lastAmbSplit = null;
+
       let countFancoil = 0; let lastAmbFancoil = null;
+      let totRiscFancoil = 0; let totRaffFancoil = 0; let totQFancoil = 0;
+
       let countCanal = 0; let lastAmbCanal = null;
       let countPavRad = 0; let lastAmbPavRad = null;
       let countSofRad = 0; let lastAmbSofRad = null;
@@ -347,17 +389,42 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
             insertSpazio(el.sotto_categoria, amb.nome);
 
             if (el.sotto_categoria === 'radiatore') {
-              wsTermicoRad.addRow([amb.piano || "", amb.nome, el.sotto_categoria, `${el.tipologia} (${el.altezza_label})`, el.watt_per_elemento || el.watt_unitario, Math.round(el.numero_elementi), Math.round(el.carico_totale_w), el.note || ""]);
-              totWRad += Math.round(el.carico_totale_w || 0);
-              totElemRad += Math.round(el.numero_elementi || 0);
-              countRad++;
+              const qRad = Math.round(el.quantita || 1);
+              const numElem = Math.round(el.numero_elementi || 0);
+              const totW = Math.round(el.carico_totale_w || 0);
+
+              wsTermicoRad.addRow([
+                amb.piano || "",
+                amb.nome,
+                el.sotto_categoria,
+                `${el.tipologia} (${el.altezza_label})`,
+                el.watt_per_elemento || el.watt_unitario,
+                numElem,
+                qRad,
+                totW,
+                el.note || ""
+              ]);
+
+              totWRad += totW;
+              totElemRad += (numElem * qRad); // Calcolo esatto di tutti gli elementi fisici presenti nella stanza
+              countRad += qRad; // Conta correttamente quanti radiatori identici hai inserito
             } else if (el.sotto_categoria === 'split') {
               wsTermicoSplit.addRow([amb.piano || "", amb.nome, el.sotto_categoria, el.label, el.watt_unitario, Math.round(el.quantita), Math.round(el.carico_totale_w), el.note || ""]);
               totWSplit += Math.round(el.carico_totale_w || 0);
               totQSplit += Math.round(el.quantita || 0);
               countSplit++;
             } else if (el.sotto_categoria === 'fancoil') {
-              wsFancoil.addRow([amb.piano || "", amb.nome, el.marca, el.modello, el.potenza_risc, el.potenza_raff, el.quantita, el.note || ""]);
+              const pRisc = parseFloat(el.potenza_risc) || 0;
+              const pRaff = parseFloat(el.potenza_raff) || 0;
+              const quantita = parseInt(el.quantita, 10) || 1;
+
+              const totRisc = el.totale_potenza_risc || Number((pRisc * quantita).toFixed(2));
+              const totRaff = el.totale_potenza_raff || Number((pRaff * quantita).toFixed(2));
+
+              wsFancoil.addRow([amb.piano || "", amb.nome, el.marca, el.modello, el.potenza_risc || "", el.potenza_raff || "", el.quantita, totRisc, totRaff, el.note || ""]);
+              totRiscFancoil += totRisc;
+              totRaffFancoil += totRaff;
+              totQFancoil += quantita;
               countFancoil++;
             } else if (el.sotto_categoria === 'canalizzato') {
               wsCanalizzato.addRow([amb.piano || "", amb.nome, el.potenza_macchina, el.note || ""]);
@@ -375,7 +442,7 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
 
       if (countRad > 0) {
         wsTermicoRad.addRow([]);
-        wsTermicoRad.addRow(["TOTALE GENERALE", "", `N. Radiatori: ${countRad}`, "", "", `Tot. Elementi: ${totElemRad}`, totWRad, ""]);
+        wsTermicoRad.addRow(["TOTALE GENERALE", "", `N. Radiatori: ${countRad}`, "", "", `Tot. Elementi: ${totElemRad}`, "", totWRad, ""]);
         wsTermicoRad.getRow(wsTermicoRad.rowCount).font = { bold: true };
       }
       if (countSplit > 0) {
@@ -383,10 +450,15 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
         wsTermicoSplit.addRow(["TOTALE GENERALE", "", `N. Split: ${countSplit}`, "", "", `Tot. Q.tà: ${totQSplit}`, totWSplit, ""]);
         wsTermicoSplit.getRow(wsTermicoSplit.rowCount).font = { bold: true };
       }
+      if (countFancoil > 0) {
+        wsFancoil.addRow([]);
+        wsFancoil.addRow(["TOTALE GENERALE", "", `N. Fancoil: ${countFancoil}`, "", "", "", `Tot. Q.tà: ${totQFancoil}`, Number(totRiscFancoil.toFixed(2)), Number(totRaffFancoil.toFixed(2)), ""]);
+        wsFancoil.getRow(wsFancoil.rowCount).font = { bold: true };
+      }
 
-      wsTermicoRad.getColumn('B').width = 25; wsTermicoRad.getColumn('D').width = 35;
+      wsTermicoRad.getColumn('B').width = 25; wsTermicoRad.getColumn('D').width = 35; wsTermicoRad.getColumn('G').width = 15;
       wsTermicoSplit.getColumn('B').width = 25; wsTermicoSplit.getColumn('D').width = 35;
-      wsFancoil.getColumn('B').width = 25; wsFancoil.getColumn('C').width = 25; wsFancoil.getColumn('D').width = 25;
+      wsFancoil.getColumn('B').width = 25; wsFancoil.getColumn('C').width = 25; wsFancoil.getColumn('D').width = 25; wsFancoil.getColumn('H').width = 15; wsFancoil.getColumn('I').width = 15;
       wsCanalizzato.getColumn('B').width = 25; wsCanalizzato.getColumn('C').width = 25;
       wsPavimentoRad.getColumn('B').width = 25; wsPavimentoRad.getColumn('C').width = 25; wsPavimentoRad.getColumn('D').width = 25;
       wsSoffittoRad.getColumn('B').width = 25; wsSoffittoRad.getColumn('C').width = 25; wsSoffittoRad.getColumn('D').width = 25;

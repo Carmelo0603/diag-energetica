@@ -2,17 +2,23 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
-import { Download, ChevronDown, LogOut } from 'lucide-react';
+import { Download, ChevronDown, LogOut, RefreshCw } from 'lucide-react';
 import { esportaRilievoExcel } from '../utils/exportExcel';
 import SearchBar from './SearchBar';
 import useSync from "../hooks/useSync";
 import { supabase } from '../lib/supabaseClient';
+import { syncData } from '../utils/sync'; // Importiamo il motore di sync manuale
 
 export default function Layout() {
     const { idEdificio, idAmbiente } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+    // Stato per l'animazione di caricamento del pulsante Sync
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    // Lasciamo l'hook in background attivo per la rete
     useSync();
 
     useEffect(() => {
@@ -28,23 +34,33 @@ export default function Layout() {
         esportaRilievoExcel(effEdificioId, tipo);
     };
 
+    // Funzione per forzare la sincronizzazione manuale
+    const handleManualSync = async () => {
+        setIsSyncing(true);
+        try {
+            await syncData();
+        } catch (error) {
+            console.error("Errore sync manuale:", error);
+            alert("Errore durante la sincronizzazione. Controlla la connessione.");
+        } finally {
+            // Un piccolo ritardo artificiale per far capire all'utente che è successo qualcosa
+            setTimeout(() => setIsSyncing(false), 800);
+        }
+    };
+
     const handleLogout = async () => {
         const confermato = window.confirm(
-            "ATTENZIONE: Stai per uscire. Assicurati che l'app abbia sincronizzato i dati (notifica verde in basso), altrimenti perderai le ultime modifiche offline. Vuoi procedere?"
+            "ATTENZIONE: Hai cliccato il pulsante verde 'SYNC' in alto a sinistra? Se esci senza aver sincronizzato, perderai le ultime stanze create offline. Vuoi procedere?"
         );
 
         if (confermato) {
             try {
-                // Svuotiamo il database locale per impedire al prossimo utente di vedere/sporcare i dati
                 await db.transaction('rw', db.edifici, db.ambienti, async () => {
                     await db.edifici.clear();
                     await db.ambienti.clear();
                 });
 
-                // Disconnessione effettiva da Supabase
                 await supabase.auth.signOut();
-
-                // Il redirect ci riporta brutalmente alla pagina di login
                 navigate('/login');
             } catch (error) {
                 console.error("Errore durante il logout:", error);
@@ -61,17 +77,30 @@ export default function Layout() {
         <div className="min-h-screen flex flex-col bg-black text-white font-sans">
             <header className="border-b-4 border-white p-6 sticky top-0 z-50 bg-black flex flex-col items-center gap-4 relative">
 
-                {/* Pulsante Logout */}
-                <button
-                    onClick={handleLogout}
-                    className="absolute left-4 top-4 z-50 bg-black text-white p-2 border-2 border-white hover:bg-red-500 hover:border-red-500 hover:text-black transition-none flex items-center gap-2 shadow-md"
-                    title="Disconnetti account"
-                >
-                    <LogOut size={24} />
-                    <span className="hidden sm:inline font-black uppercase text-sm">Esci</span>
-                </button>
+                {/* GRUPPO PULSANTI SINISTRA: Logout e Sync */}
+                <div className="absolute left-4 top-4 z-50 flex gap-2">
+                    <button
+                        onClick={handleLogout}
+                        className="bg-black text-white p-2 border-2 border-white hover:bg-red-500 hover:border-red-500 hover:text-black transition-none flex items-center shadow-md"
+                        title="Disconnetti account"
+                    >
+                        <LogOut size={24} />
+                    </button>
 
-                <Link to="/" className="font-mono text-4xl font-black tracking-tighter hover:text-green-500 transition-colors uppercase mt-8 sm:mt-0">
+                    <button
+                        onClick={handleManualSync}
+                        disabled={isSyncing}
+                        className={`bg-green-500 text-black p-2 border-2 border-white hover:bg-white transition-none flex items-center gap-2 shadow-md ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        title="Forza Sincronizzazione Cloud"
+                    >
+                        <RefreshCw size={24} className={isSyncing ? 'animate-spin' : ''} />
+                        <span className="hidden sm:inline font-black uppercase text-sm">
+                            {isSyncing ? 'Sync in corso...' : 'Sync Dati'}
+                        </span>
+                    </button>
+                </div>
+
+                <Link to="/" className="font-mono text-4xl font-black tracking-tighter hover:text-green-500 transition-colors uppercase mt-10 sm:mt-0">
                     UBIARCHIUM
                 </Link>
 

@@ -45,10 +45,14 @@ const ASSET_SCUOLE_UFFICI = [
   { id: "caffe_monete", label: "Macchina caffè a monete", watt: 1500, tipo: "apparecchi", categoria: "apparecchio" },
   { id: "pc_fisso", label: "PC Fisso", watt: 200, tipo: "apparecchi", categoria: "apparecchio" },
   { id: "split", label: "Split Clima", watt: 1000, tipo: "apparecchi", categoria: "climatizzazione" },
-  { id: "scaldacqua", label: "scaldacqua elettrico 20 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
-  { id: "scaldacqua", label: "scaldacqua elettrico 30 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
-  { id: "scaldacqua", label: "scaldacqua elettrico 50 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
-  { id: "scaldacqua", label: "scaldacqua elettrico 80 litri", watt: 1500, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "stampante_ufficio", label: "Stampante Ufficio", watt: 50, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua_20", label: "scaldacqua elettrico 20 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua_30", label: "scaldacqua elettrico 30 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua_50", label: "scaldacqua elettrico 50 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "scaldacqua_80", label: "scaldacqua elettrico 80 litri", watt: 1500, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "stampante_ls", label: "stampante laser", watt: 600, tipo: "apparecchi", categoria: "apparecchio" },
+
+  { id: "stampante_ink", label: "stampante INK", watt: 26, tipo: "apparecchi", categoria: "apparecchio" },
 ];
 
 const ASSET_CASA_DI_RIPOSO = [
@@ -95,9 +99,9 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
   const [customLumen, setCustomLumen] = useState("");
   const [note, setNote] = useState("");
 
-  const [puntiLuce, setPuntiLuce] = useState(1);
-  const [lampadePerPunto, setLampadePerPunto] = useState(1);
-  const [quantitaApparecchi, setQuantitaApparecchi] = useState(1);
+  const [puntiLuce, setPuntiLuce] = useState("");
+  const [lampadePerPunto, setLampadePerPunto] = useState("");
+  const [quantitaApparecchi, setQuantitaApparecchi] = useState("");
 
   const isCustom = assetId === "custom";
   const isLuci = tipoForm === "luci";
@@ -113,14 +117,14 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
         setCustomWatt(initialData.watt_unitario);
         setCustomLumen(initialData.lumen_cad || "");
       }
-      setPuntiLuce(initialData.punti_luce || 1);
-      setLampadePerPunto(initialData.lampade_per_punto || 1);
-      setQuantitaApparecchi(initialData.quantita || 1);
+      setPuntiLuce(initialData.punti_luce || "");
+      setLampadePerPunto(initialData.lampade_per_punto || "");
+      setQuantitaApparecchi(initialData.quantita || "");
       setNote(initialData.note || "");
     }
   }, [initialData]);
 
-  const quantitaTotaleLuci = parseInt(puntiLuce || 1, 10) * parseInt(lampadePerPunto || 1, 10);
+  const quantitaTotaleLuci = parseInt(puntiLuce || 0, 10) * parseInt(lampadePerPunto || 0, 10);
   const assetSelezionato = ASSET_CORRENTI.find((a) => a.id === assetId);
   const lumenUnitari = isCustom ? parseInt(customLumen || 0, 10) : assetSelezionato?.lumen || 0;
 
@@ -139,6 +143,9 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
       watt = assetSelezionato.watt;
       categoria = assetSelezionato.categoria;
     }
+
+    if (isLuci && (!puntiLuce || !lampadePerPunto)) return;
+    if (!isLuci && !quantitaApparecchi) return;
 
     const quantitaFinale = isLuci ? quantitaTotaleLuci : parseInt(quantitaApparecchi, 10);
 
@@ -162,9 +169,9 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
       setCustomWatt("");
       setCustomLumen("");
       setNote("");
-      setPuntiLuce(1);
-      setLampadePerPunto(1);
-      setQuantitaApparecchi(1);
+      setPuntiLuce("");
+      setLampadePerPunto("");
+      setQuantitaApparecchi("");
     }
   };
 
@@ -234,6 +241,7 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
                   <input
                       type="number"
                       min="1"
+                      placeholder="ES. 1"
                       value={puntiLuce}
                       onChange={(e) => setPuntiLuce(e.target.value)}
                       required
@@ -245,6 +253,7 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
                   <input
                       type="number"
                       min="1"
+                      placeholder="ES. 1"
                       value={lampadePerPunto}
                       onChange={(e) => setLampadePerPunto(e.target.value)}
                       required
@@ -253,7 +262,7 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
                 </div>
                 <div className="sm:col-span-6 flex flex-col h-[60px] justify-center items-center border-4 border-green-500 bg-black">
               <span className="text-xl font-black text-green-500">
-                {quantitaTotaleLuci} <span className="text-white text-sm">LAMP.</span> | {lumenUnitari * quantitaTotaleLuci}{" "}
+                {quantitaTotaleLuci || 0} <span className="text-white text-sm">LAMP.</span> | {(lumenUnitari * quantitaTotaleLuci) || 0}{" "}
                 <span className="text-white text-sm">LM TOT.</span>
               </span>
                 </div>
@@ -264,6 +273,7 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
                 <input
                     type="number"
                     min="1"
+                    placeholder="ES. 1"
                     value={quantitaApparecchi}
                     onChange={(e) => setQuantitaApparecchi(e.target.value)}
                     required

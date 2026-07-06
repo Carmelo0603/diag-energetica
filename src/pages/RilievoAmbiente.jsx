@@ -43,8 +43,16 @@ const renderTermicoLabel = (el) => {
 const renderTermicoStats = (el) => {
   switch(el.sotto_categoria) {
     case 'radiatore': return `N. ${el.numero_elementi} EL. | ${el.carico_totale_w} W`;
-    case 'split': return `${el.carico_totale_w} W`;
-    case 'fancoil': return `Q.TA: ${el.quantita} | RISC: ${el.potenza_risc}W | RAFF: ${el.potenza_raff}W`;
+    case 'split': return `Q.TA: ${el.quantita} | TOTALE: ${el.carico_totale_w} W`;
+    case 'fancoil': {
+      const pRisc = parseFloat(el.potenza_risc) || 0;
+      const pRaff = parseFloat(el.potenza_raff) || 0;
+      const q = parseInt(el.quantita, 10) || 1;
+
+      const totRisc = el.totale_potenza_risc || Number((pRisc * q).toFixed(2));
+      const totRaff = el.totale_potenza_raff || Number((pRaff * q).toFixed(2));
+      return `Q.TA: ${el.quantita} | TOT. RISC: ${totRisc}W | TOT. RAFF: ${totRaff}W`;
+    }
     case 'canalizzato': return `POTENZA MACCHINA: ${el.potenza_macchina}W`;
     case 'pavimento_radiante':
     case 'soffitto_radiante': return `SUP: ${el.superficie} MQ | PASSO POSA: ${el.passo_posa}`;
@@ -60,7 +68,7 @@ export default function RilievoAmbiente() {
   const [tipoInserimento, setTipoInserimento] = useState('luci');
   const [elementoInModifica, setElementoInModifica] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
-  const [alertMessaggio, setAlertMessaggio] = useState(''); // Nuovo stato per il toast alert
+  const [alertMessaggio, setAlertMessaggio] = useState('');
 
   const ambiente = useLiveQuery(() => db.ambienti.get(idAmbiente));
 
@@ -86,7 +94,6 @@ export default function RilievoAmbiente() {
 
   const elementi = ambiente.elementi_inseriti || [];
 
-  // Aggiunto .reverse() per ordinare dal più recente al più vecchio
   const elementiFiltrati = elementi
       .filter(el => el.categoria === MAPPA_CATEGORIE[tipoInserimento])
       .reverse();
@@ -104,7 +111,6 @@ export default function RilievoAmbiente() {
 
     await db.ambienti.update(idAmbiente, { elementi_inseriti: elementiAggiornati });
 
-    // Gestione Alert (Toast)
     setAlertMessaggio(isModifica ? "ELEMENTO AGGIORNATO" : "ELEMENTO REGISTRATO");
     setTimeout(() => setAlertMessaggio(''), 2000);
   };
@@ -123,7 +129,6 @@ export default function RilievoAmbiente() {
   return (
       <div className="space-y-12 relative">
 
-        {/* Toast Alert Fluttuante */}
         {alertMessaggio && (
             <div className="fixed bottom-8 right-8 bg-green-500 text-black px-6 py-4 font-black uppercase text-lg border-4 border-white shadow-[8px_8px_0_0_#fff] z-50 animate-bounce">
               {alertMessaggio}
