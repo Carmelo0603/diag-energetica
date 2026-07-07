@@ -109,7 +109,11 @@ export default function RilievoAmbiente() {
       elementiAggiornati = [...elementi, elementoCorrente];
     }
 
-    await db.ambienti.update(idAmbiente, { elementi_inseriti: elementiAggiornati });
+    await db.ambienti.update(idAmbiente, {
+      elementi_inseriti: elementiAggiornati,
+      is_synced: 0,
+      last_modified: new Date().toISOString()
+    });
 
     setAlertMessaggio(isModifica ? "ELEMENTO AGGIORNATO" : "ELEMENTO REGISTRATO");
     setTimeout(() => setAlertMessaggio(''), 2000);
@@ -117,7 +121,11 @@ export default function RilievoAmbiente() {
 
   const handleRimuoviElemento = async (idIstanza) => {
     const elementiAggiornati = elementi.filter(el => el.id_istanza !== idIstanza);
-    await db.ambienti.update(idAmbiente, { elementi_inseriti: elementiAggiornati });
+    await db.ambienti.update(idAmbiente, {
+      elementi_inseriti: elementiAggiornati,
+      is_synced: 0,
+      last_modified: new Date().toISOString()
+    });
   };
 
   const impostaModifica = (el) => {

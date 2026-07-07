@@ -21,7 +21,6 @@ export default function DettaglioEdificio() {
   const [superficieMq, setSuperficieMq] = useState('');
   const [stanzaInModifica, setStanzaInModifica] = useState(null);
 
-  // Nuovo stato per l'Hard Block dei duplicati
   const [erroreNome, setErroreNome] = useState('');
 
   const [nuovoPod, setNuovoPod] = useState('');
@@ -45,7 +44,7 @@ export default function DettaglioEdificio() {
 
   const ambienti = useLiveQuery(async () => {
     const ambs = await db.ambienti.where('id_edificio').equals(idEdificio).toArray();
-    return ambs.sort((a, b) => {
+    return ambs.filter(a => !a._deleted).sort((a, b) => {
       const timeA = a.last_modified ? new Date(a.last_modified).getTime() : 0;
       const timeB = b.last_modified ? new Date(b.last_modified).getTime() : 0;
       return timeB - timeA;
@@ -71,7 +70,9 @@ export default function DettaglioEdificio() {
     }
     await db.edifici.update(idEdificio, {
       pods: arrayPods,
-      pdr: codicePdr.trim().toUpperCase()
+      pdr: codicePdr.trim().toUpperCase(),
+      is_synced: 0,
+      last_modified: new Date().toISOString()
     });
     setNuovoPod('');
   };
@@ -79,7 +80,11 @@ export default function DettaglioEdificio() {
   const handleRimuoviPod = async (index) => {
     const arrayPods = [...edificio.pods];
     arrayPods.splice(index, 1);
-    await db.edifici.update(idEdificio, { pods: arrayPods });
+    await db.edifici.update(idEdificio, {
+      pods: arrayPods,
+      is_synced: 0,
+      last_modified: new Date().toISOString()
+    });
   };
 
   const handleCreaOAggiornaAmbiente = async (e) => {
@@ -97,6 +102,7 @@ export default function DettaglioEdificio() {
     const pianoFinale = isCustomPiano ? customPiano.trim().toUpperCase() : pianoStanza;
 
     const finalMq = superficieMq ? parseFloat(superficieMq) : null;
+
     if (isCustom) {
       if (!nomeLibero || !customLux) return;
       nomeFinale = unitaLabel ? `${nomeLibero} (${unitaLabel})` : nomeLibero;
@@ -112,7 +118,6 @@ export default function DettaglioEdificio() {
       }
     }
 
-    // --- HARD BLOCK: Controllo Duplicati ---
     const checkDuplicato = ambienti.find(a =>
         a.nome.trim().toLowerCase() === nomeFinale.trim().toLowerCase() &&
         a.id !== stanzaInModifica?.id
@@ -120,10 +125,10 @@ export default function DettaglioEdificio() {
 
     if (checkDuplicato) {
       setErroreNome(`ERRORE: Esiste già un ambiente chiamato "${nomeFinale}". Sii più specifico per evitare duplicati.`);
-      return; // Blocca il salvataggio
+      return;
     }
 
-    setErroreNome(''); // Pulisce l'errore se il check passa
+    setErroreNome('');
 
     if (stanzaInModifica) {
       await db.ambienti.update(stanzaInModifica.id, {
@@ -132,13 +137,14 @@ export default function DettaglioEdificio() {
         mq: finalMq,
         destinazione_uso_id: destinazioneId,
         lux_normativi: targetLux,
-        id_unita: isCondominio && !isResidenziale ? idUnitaSelezionata : ''
+        id_unita: isCondominio && !isResidenziale ? idUnitaSelezionata : '',
+        is_synced: 0,
+        last_modified: new Date().toISOString()
       });
       setStanzaInModifica(null);
       setDestinazioneId(''); setNomeLibero(''); setCustomLux(''); setSuperficieMq(''); setIdUnitaSelezionata(''); setPianoStanza(''); setCustomPiano('');
     } else {
       const newAmbienteId = `amb_${crypto.randomUUID()}`;
-
       await db.ambienti.add({
         id: newAmbienteId,
         id_edificio: idEdificio,
@@ -148,9 +154,10 @@ export default function DettaglioEdificio() {
         id_unita: isCondominio && !isResidenziale ? idUnitaSelezionata : '',
         destinazione_uso_id: destinazioneId,
         lux_normativi: targetLux,
-        elementi_inseriti: []
+        elementi_inseriti: [],
+        is_synced: 0,
+        last_modified: new Date().toISOString()
       });
-
       navigate(`/ambiente/${newAmbienteId}`);
     }
   };
@@ -164,6 +171,11 @@ export default function DettaglioEdificio() {
     setSuperficieMq(amb.mq ? amb.mq.toString() : '');
     setIdUnitaSelezionata(amb.id_unita || '');
     setErroreNome('');
+
+    // Isoliamo il nome pulito senza l'etichetta dell'unità per ricaricarlo nel form
+    const rawNome = amb.nome ? amb.nome.split(' (Sub.')[0].trim() : '';
+    setNomeLibero(rawNome);
+
     if (amb.destinazione_uso_id === 'custom') {
       setCustomLux(amb.lux_normativi.toString());
     }
@@ -173,12 +185,28 @@ export default function DettaglioEdificio() {
   const handleRimuoviAmbiente = async (e, idAmbiente) => {
     e.preventDefault();
     if (window.confirm("Eliminare questa stanza e tutto il suo inventario?")) {
-      await db.ambienti.delete(idAmbiente);
+      await db.ambienti.update(idAmbiente, {
+        _deleted: true,
+        is_synced: 0,
+        last_modified: new Date().toISOString()
+      });
     }
   };
 
-  const handleAggiungiUnita = async (e) => { e.preventDefault(); if (!proprietario || !subalterno) return; const nuovaUnita = { id_unita: `u_${crypto.randomUUID()}`, proprietario, piano: pianoUnita, foglio, particella, subalterno }; const arrayUnita = [...unitaList, nuovaUnita]; await db.edifici.update(idEdificio, { unita_immobiliari: arrayUnita }); setProprietario(''); setPianoUnita(''); setFoglio(''); setParticella(''); setSubalterno(''); };
-  const handleRimuoviUnita = async (idUnita) => { const arrayUnita = unitaList.filter(u => u.id_unita !== idUnita); await db.edifici.update(idEdificio, { unita_immobiliari: arrayUnita }); if (idUnitaSelezionata === idUnita) setIdUnitaSelezionata(''); };
+  const handleAggiungiUnita = async (e) => {
+    e.preventDefault();
+    if (!proprietario || !subalterno) return;
+    const nuovaUnita = { id_unita: `u_${crypto.randomUUID()}`, proprietario, piano: pianoUnita, foglio, particella, subalterno };
+    const arrayUnita = [...unitaList, nuovaUnita];
+    await db.edifici.update(idEdificio, { unita_immobiliari: arrayUnita, is_synced: 0, last_modified: new Date().toISOString() });
+    setProprietario(''); setPianoUnita(''); setFoglio(''); setParticella(''); setSubalterno('');
+  };
+
+  const handleRimuoviUnita = async (idUnita) => {
+    const arrayUnita = unitaList.filter(u => u.id_unita !== idUnita);
+    await db.edifici.update(idEdificio, { unita_immobiliari: arrayUnita, is_synced: 0, last_modified: new Date().toISOString() });
+    if (idUnitaSelezionata === idUnita) setIdUnitaSelezionata('');
+  };
 
   const handleCreaOAggiornaGeneratore = async (e) => {
     e.preventDefault();
@@ -194,7 +222,7 @@ export default function DettaglioEdificio() {
               ? { ...g, tipo: tipoGeneratore, vettore: vettoreEnergetico, marca: marcaGeneratore, kw, quantita: q, totale_kw }
               : g
       );
-      await db.edifici.update(idEdificio, { generatori_calore: arrayGenAggiornato });
+      await db.edifici.update(idEdificio, { generatori_calore: arrayGenAggiornato, is_synced: 0, last_modified: new Date().toISOString() });
       setGeneratoreInModifica(null);
     } else {
       const nuovoGen = {
@@ -207,7 +235,7 @@ export default function DettaglioEdificio() {
         totale_kw: totale_kw
       };
       const arrayGen = [...generatoriList, nuovoGen];
-      await db.edifici.update(idEdificio, { generatori_calore: arrayGen });
+      await db.edifici.update(idEdificio, { generatori_calore: arrayGen, is_synced: 0, last_modified: new Date().toISOString() });
     }
 
     setTipoGeneratore('caldaia');
@@ -239,7 +267,7 @@ export default function DettaglioEdificio() {
 
   const handleRimuoviGeneratore = async (idGen) => {
     const arrayGen = generatoriList.filter(g => g.id_generatore !== idGen);
-    await db.edifici.update(idEdificio, { generatori_calore: arrayGen });
+    await db.edifici.update(idEdificio, { generatori_calore: arrayGen, is_synced: 0, last_modified: new Date().toISOString() });
   };
 
   return (
@@ -406,7 +434,7 @@ export default function DettaglioEdificio() {
 
                   <div className="flex gap-4">
                     <button type="submit" className="flex-1 bg-white text-black font-black text-xl py-4 uppercase border-2 border-white hover:bg-green-500 transition-none">{stanzaInModifica ? 'Aggiorna Stanza' : 'Crea Ambiente'}</button>
-                    {stanzaInModifica && <button type="button" onClick={() => { setStanzaInModifica(null); setDestinazioneId(''); setSuperficieMq(''); setPianoStanza(''); setCustomPiano(''); setErroreNome(''); }} className="bg-black text-white border-4 border-white px-6 font-black uppercase text-sm hover:border-red-500 hover:text-red-500 transition-none">Annulla</button>}
+                    {stanzaInModifica && <button type="button" onClick={() => { setStanzaInModifica(null); setDestinazioneId(''); setSuperficieMq(''); setPianoStanza(''); setCustomPiano(''); setErroreNome(''); setNomeLibero(''); }} className="bg-black text-white border-4 border-white px-6 font-black uppercase text-sm hover:border-red-500 hover:text-red-500 transition-none">Annulla</button>}
                   </div>
                 </form>
               </section>
