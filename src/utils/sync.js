@@ -1,6 +1,22 @@
 import { db } from '../db/database';
 import { supabase } from '../lib/supabaseClient';
 
+// Helper per unire array di oggetti in base a una chiave univoca (ID)
+function mergeArrays(remoteArr = [], localArr = [], uniqueKey) {
+    const map = new Map();
+    // 1. Inseriamo prima i dati dal server
+    (remoteArr || []).forEach(item => map.set(item[uniqueKey], item));
+    // 2. I dati locali sovrascrivono i remoti a parità di ID (se li abbiamo modificati)
+    // e aggiungono le nuove righe create offline
+    (localArr || []).forEach(item => map.set(item[uniqueKey], item));
+    return Array.from(map.values());
+}
+
+// Helper per unire array di primitive (es. codici POD) rimuovendo i duplicati
+function mergePrimitiveArrays(arr1 = [], arr2 = []) {
+    return [...new Set([...(arr1 || []), ...(arr2 || [])])];
+}
+
 export async function syncData() {
     // 1. Usciamo subito se siamo offline
     if (!navigator.onLine) return;
@@ -12,86 +28,127 @@ export async function syncData() {
     const userId = session.user.id;
 
     try {
-        // ==========================================
-        // FASE 1: PUSH (Da Locale a Cloud)
-        // ==========================================
-
-// Invece di usare il .where() che ignora gli 'undefined', peschiamo tutto
-        const tuttiEdifici = await db.edifici.toArray();
-        const tuttiAmbienti = await db.ambienti.toArray();
-
-// Filtriamo a mano in Javascript: prendiamo quelli con 0 OPPURE i vecchi progetti (undefined)
-        const edificiDaInviare = tuttiEdifici.filter(e => e.is_synced === 0 || e.is_synced === undefined);
-        const ambientiDaInviare = tuttiAmbienti.filter(a => a.is_synced === 0 || a.is_synced === undefined);
-
-// Prepariamo i payload per Supabase:
-// 1. Togliamo is_synced (che a Supabase non piace)
-// 2. Aggiungiamo lo user_id
-// 3. Ci assicuriamo che ci sia una data in last_modified
-        const edificiPayload = edificiDaInviare.map(({ is_synced, ...e }) => ({
-            ...e,
-            user_id: userId,
-            last_modified: e.last_modified || new Date().toISOString()
-        }));
-
-        const ambientiPayload = ambientiDaInviare.map(({ is_synced, ...a }) => ({
-            ...a,
-            user_id: userId,
-            last_modified: a.last_modified || new Date().toISOString()
-        }));
-
-// Mandiamo tutto su Supabase
-        if (edificiPayload.length > 0) {
-            const { error } = await supabase.from('edifici').upsert(edificiPayload);
-            if (error) throw new Error(`Errore Push Edifici: ${error.message}`);
-        }
-
-        if (ambientiPayload.length > 0) {
-            const { error } = await supabase.from('ambienti').upsert(ambientiPayload);
-            if (error) throw new Error(`Errore Push Ambienti: ${error.message}`);
-        }
-
-// Aggiorniamo i record salvati in locale, segnandoli come sincronizzati (1) e aggiungendo il user_id locale
-        await db.transaction('rw', db.edifici, db.ambienti, async () => {
-            for (let e of edificiDaInviare) {
-                await db.edifici.update(e.id, { is_synced: 1, user_id: userId });
-            }
-            for (let a of ambientiDaInviare) {
-                await db.ambienti.update(a.id, { is_synced: 1, user_id: userId });
-            }
-        });
+        console.log("🔄 Inizio Sincronizzazione Bi-direzionale...");
 
         // ==========================================
-        // FASE 2: PULL (Da Cloud a Locale)
+        // FASE 1: PULL INIZIALE (Scopriamo la verità sul cloud)
         // ==========================================
-
-        // Tiriamo giù i dati (Supabase filtrerà in automatico solo quelli dello studio grazie alle RLS)
         const { data: edificiRemoti, error: errEdifici } = await supabase.from('edifici').select('*');
         const { data: ambientiRemoti, error: errAmbienti } = await supabase.from('ambienti').select('*');
 
-        if (errEdifici || errAmbienti) throw new Error("Errore durante il Pull da Supabase");
+        if (errEdifici || errAmbienti) throw new Error("Errore durante il Pull pre-merge da Supabase");
+
+        // Creiamo delle mappe per cercare velocemente gli id
+        const remotiEdificiMap = new Map((edificiRemoti || []).map(e => [e.id, e]));
+        const remotiAmbientiMap = new Map((ambientiRemoti || []).map(a => [a.id, a]));
+
+        // Prendiamo tutto quello che abbiamo in pancia (Dexie)
+        const tuttiEdifici = await db.edifici.toArray();
+        const tuttiAmbienti = await db.ambienti.toArray();
+
+        const payloadEdifici = [];
+        const payloadAmbienti = [];
+
+        // ==========================================
+        // FASE 2: MERGE E PREPARAZIONE PUSH
+        // ==========================================
+
+        // Processiamo gli Edifici Locali
+        for (let loc of tuttiEdifici) {
+            // Analizziamo solo quelli sporchi/non sincronizzati
+            if (loc.is_synced === 0 || loc.is_synced === undefined) {
+                const rem = remotiEdificiMap.get(loc.id);
+                if (rem) {
+                    // CONFLITTO TROVATO: Uniamo gli array in modo intelligente
+                    loc.generatori_calore = mergeArrays(rem.generatori_calore, loc.generatori_calore, 'id_generatore');
+                    loc.unita_immobiliari = mergeArrays(rem.unita_immobiliari, loc.unita_immobiliari, 'id_unita');
+                    loc.pods = mergePrimitiveArrays(rem.pods, loc.pods);
+
+                    const isLocalNewer = new Date(loc.last_modified).getTime() > new Date(rem.last_modified).getTime();
+                    if (!isLocalNewer) {
+                        // Se il server ha metadati testuali più recenti, teniamo quelli del server
+                        loc.nome = rem.nome;
+                        loc.note = rem.note;
+                        loc.pdr = rem.pdr;
+                        loc.macro_categoria = rem.macro_categoria;
+                        loc.tipologia = rem.tipologia;
+                    }
+                }
+
+                loc.user_id = userId;
+                loc.last_modified = new Date().toISOString();
+                payloadEdifici.push(loc);
+            }
+        }
+
+        // Processiamo gli Ambienti Locali
+        for (let loc of tuttiAmbienti) {
+            // Analizziamo solo quelli sporchi/non sincronizzati
+            if (loc.is_synced === 0 || loc.is_synced === undefined) {
+                const rem = remotiAmbientiMap.get(loc.id);
+                if (rem) {
+                    // CONFLITTO TROVATO: Uniamo l'inventario senza sovrascriverlo!
+                    loc.elementi_inseriti = mergeArrays(rem.elementi_inseriti, loc.elementi_inseriti, 'id_istanza');
+
+                    const isLocalNewer = new Date(loc.last_modified).getTime() > new Date(rem.last_modified).getTime();
+                    if (!isLocalNewer) {
+                        // Se il server ha rinominato la stanza o cambiato i mq dopo di noi
+                        loc.nome = rem.nome;
+                        loc.mq = rem.mq;
+                        loc.piano = rem.piano;
+                        loc.lux_normativi = rem.lux_normativi;
+                        loc.destinazione_uso_id = rem.destinazione_uso_id;
+                    }
+                }
+
+                loc.user_id = userId;
+                loc.last_modified = new Date().toISOString();
+                payloadAmbienti.push(loc);
+            }
+        }
+
+        // ==========================================
+        // FASE 3: PUSH SU SUPABASE
+        // ==========================================
+
+        // Rimuoviamo il tag locale is_synced prima di spedire il pacchetto
+        const cleanEdificiPush = payloadEdifici.map(({ is_synced, ...e }) => e);
+        const cleanAmbientiPush = payloadAmbienti.map(({ is_synced, ...a }) => a);
+
+        if (cleanEdificiPush.length > 0) {
+            const { error } = await supabase.from('edifici').upsert(cleanEdificiPush);
+            if (error) throw new Error(`Errore Upsert Edifici: ${error.message}`);
+        }
+
+        if (cleanAmbientiPush.length > 0) {
+            const { error } = await supabase.from('ambienti').upsert(cleanAmbientiPush);
+            if (error) throw new Error(`Errore Upsert Ambienti: ${error.message}`);
+        }
+
+        // ==========================================
+        // FASE 4: FINAL PULL E ALLINEAMENTO LOCALE
+        // ==========================================
+
+        // Adesso che Supabase ha la "Verità Fusa Assoluta", la riscarichiamo
+        // e allineiamo brutalmente IndexedDB affinché tutti i tablet siano identici
+        const { data: finalEdifici, error: finalErrE } = await supabase.from('edifici').select('*');
+        const { data: finalAmbienti, error: finalErrA } = await supabase.from('ambienti').select('*');
+
+        if (finalErrE || finalErrA) throw new Error("Errore durante il Pull finale");
 
         await db.transaction('rw', db.edifici, db.ambienti, async () => {
-            // Sincronizza Edifici
-            for (let rem of edificiRemoti) {
-                const loc = await db.edifici.get(rem.id);
-                // Se in locale non esiste, o se il record in cloud è più recente, lo sovrascriviamo in locale
-                if (!loc || new Date(rem.last_modified) > new Date(loc.last_modified)) {
-                    await db.edifici.put({ ...rem, is_synced: 1 });
-                }
+            for (let rem of (finalEdifici || [])) {
+                await db.edifici.put({ ...rem, is_synced: 1 });
             }
-            // Sincronizza Ambienti
-            for (let rem of ambientiRemoti) {
-                const loc = await db.ambienti.get(rem.id);
-                if (!loc || new Date(rem.last_modified) > new Date(loc.last_modified)) {
-                    await db.ambienti.put({ ...rem, is_synced: 1 });
-                }
+            for (let rem of (finalAmbienti || [])) {
+                await db.ambienti.put({ ...rem, is_synced: 1 });
             }
         });
 
-        console.log("🟢 Sincronizzazione Offline-First completata!");
+        console.log("🟢 Merge Bi-direzionale completato con successo!");
 
     } catch (error) {
         console.error("🔴 Sincronizzazione fallita:", error);
+        throw error; // Rilanciamo l'errore per fermare la rotellina sull'interfaccia
     }
 }
