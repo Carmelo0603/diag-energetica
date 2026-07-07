@@ -31,27 +31,32 @@ const MAPPA_TITOLI = {
 const renderTermicoLabel = (el) => {
   switch(el.sotto_categoria) {
     case 'radiatore': return `${el.tipologia} (${el.altezza_label})`;
-    case 'split': return el.label;
-    case 'fancoil': return `Fancoil ${el.marca} ${el.modello}`;
+    case 'split': return `Split ${el.marca || el.label || ''} ${el.modello || ''}`;
+    case 'fancoil': return `Fancoil ${el.marca || ''} ${el.modello || ''}`;
     case 'canalizzato': return `Macchina Canalizzato`;
-    case 'pavimento_radiante': return `Pavimento Radiante ${el.marca} ${el.modello}`;
-    case 'soffitto_radiante': return `Soffitto Radiante ${el.marca} ${el.modello}`;
+    case 'pavimento_radiante': return `Pavimento Radiante ${el.marca || ''} ${el.modello || ''}`;
+    case 'soffitto_radiante': return `Soffitto Radiante ${el.marca || ''} ${el.modello || ''}`;
     default: return el.label || 'SISTEMA TERMICO';
   }
 };
 
 const renderTermicoStats = (el) => {
   switch(el.sotto_categoria) {
-    case 'radiatore': return `N. ${el.numero_elementi} EL. | ${el.carico_totale_w} W`;
-    case 'split': return `Q.TA: ${el.quantita} | TOTALE: ${el.carico_totale_w} W`;
+    case 'radiatore': {
+      const q = el.quantita || 1;
+      const elPerRad = el.numero_elementi || 0;
+      const totEl = q * elPerRad;
+      return `Q.TÀ: ${q} RAD. | ${elPerRad} EL/CAD | TOT: ${totEl} ELEMENTI | ${el.carico_totale_w} W`;
+    }
+    case 'split':
     case 'fancoil': {
-      const pRisc = parseFloat(el.potenza_risc) || 0;
+      const pRisc = parseFloat(el.potenza_risc) || parseFloat(el.watt_unitario) || 0;
       const pRaff = parseFloat(el.potenza_raff) || 0;
       const q = parseInt(el.quantita, 10) || 1;
 
       const totRisc = el.totale_potenza_risc || Number((pRisc * q).toFixed(2));
       const totRaff = el.totale_potenza_raff || Number((pRaff * q).toFixed(2));
-      return `Q.TA: ${el.quantita} | TOT. RISC: ${totRisc}W | TOT. RAFF: ${totRaff}W`;
+      return `Q.TA: ${q} | TOT. RISC: ${totRisc}W | TOT. RAFF: ${totRaff}W`;
     }
     case 'canalizzato': return `POTENZA MACCHINA: ${el.potenza_macchina}W`;
     case 'pavimento_radiante':
@@ -69,6 +74,8 @@ export default function RilievoAmbiente() {
   const [elementoInModifica, setElementoInModifica] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
   const [alertMessaggio, setAlertMessaggio] = useState('');
+
+  const [ordinamento, setOrdinamento] = useState('data_desc');
 
   const ambiente = useLiveQuery(() => db.ambienti.get(idAmbiente));
 
@@ -94,9 +101,24 @@ export default function RilievoAmbiente() {
 
   const elementi = ambiente.elementi_inseriti || [];
 
-  const elementiFiltrati = elementi
+  const elementiFiltrati = [...elementi]
+      .map((el, index) => ({ ...el, originalIndex: index }))
       .filter(el => el.categoria === MAPPA_CATEGORIE[tipoInserimento])
-      .reverse();
+      .sort((a, b) => {
+        if (ordinamento === 'data_desc') return b.originalIndex - a.originalIndex;
+        if (ordinamento === 'data_asc') return a.originalIndex - b.originalIndex;
+
+        let nomeA = a.label || '';
+        let nomeB = b.label || '';
+        if (a.categoria === 'termico') { nomeA = renderTermicoLabel(a); }
+        if (b.categoria === 'termico') { nomeB = renderTermicoLabel(b); }
+        if (a.categoria === 'infissi') { nomeA = `Infisso ${a.tipologia}`; }
+        if (b.categoria === 'infissi') { nomeB = `Infisso ${b.tipologia}`; }
+
+        if (ordinamento === 'alfa_asc') return nomeA.localeCompare(nomeB);
+        if (ordinamento === 'alfa_desc') return nomeB.localeCompare(nomeA);
+        return 0;
+      });
 
   const handleSalvaElemento = async (elementoCorrente) => {
     let elementiAggiornati;
@@ -148,7 +170,7 @@ export default function RilievoAmbiente() {
           <div className="flex flex-col sm:flex-row justify-between items-start">
             <div>
               <h2 className="text-4xl font-black tracking-tighter uppercase">{ambiente.nome}</h2>
-              <p className="font-bold text-green-500 mt-2 uppercase">PIANO: {ambiente.piano} | {ambiente.mq || "NON SPECIFICATO"} MQ | TARGET: {ambiente.lux_normativi} LUX</p>
+              <p className="font-bold text-green-500 mt-2 uppercase">PIANO: {ambiente.piano} | {ambiente.mq ? Number(ambiente.mq).toFixed(2).replace('.', ',') : "NON SPECIFICATO"} MQ | TARGET: {ambiente.lux_normativi} LUX</p>
             </div>
             <div className="mt-4 sm:mt-0 border-4 border-white p-4 text-center min-w-[120px]">
               <span className="block text-4xl font-black">{elementiFiltrati.length}</span>
@@ -177,9 +199,22 @@ export default function RilievoAmbiente() {
         </div>
 
         <div className="space-y-4 pb-12">
-          <h3 className="text-xl font-black uppercase tracking-tighter mb-6">
-            Inventario Stanza: <span className="text-green-500">{MAPPA_TITOLI[tipoInserimento]}</span>
-          </h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <h3 className="text-xl font-black uppercase tracking-tighter">
+              Inventario Stanza: <span className="text-green-500">{MAPPA_TITOLI[tipoInserimento]}</span>
+            </h3>
+            <select
+                value={ordinamento}
+                onChange={(e) => setOrdinamento(e.target.value)}
+                className="bg-black border-2 border-zinc-700 text-zinc-400 p-2 uppercase text-xs font-bold focus:border-green-500 focus:text-green-500 outline-none cursor-pointer"
+            >
+              <option value="data_desc">Ordina: Più recenti</option>
+              <option value="data_asc">Ordina: Meno recenti</option>
+              <option value="alfa_asc">Ordina: Alfabetico (A-Z)</option>
+              <option value="alfa_desc">Ordina: Alfabetico (Z-A)</option>
+            </select>
+          </div>
+
           {elementiFiltrati.length === 0 ? <p className="font-bold uppercase p-6 border-2 border-dashed border-zinc-700 text-center text-zinc-500">Nessun asset censito in questa categoria.</p> : (
               <div className="grid gap-4">
                 {elementiFiltrati.map(el => (

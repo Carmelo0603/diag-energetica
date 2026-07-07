@@ -22,6 +22,7 @@ export default function DettaglioEdificio() {
   const [stanzaInModifica, setStanzaInModifica] = useState(null);
 
   const [erroreNome, setErroreNome] = useState('');
+  const [ordinamento, setOrdinamento] = useState('data_desc');
 
   const [nuovoPod, setNuovoPod] = useState('');
   const [codicePdr, setCodicePdr] = useState('');
@@ -42,14 +43,16 @@ export default function DettaglioEdificio() {
 
   const edificio = useLiveQuery(() => db.edifici.get(idEdificio));
 
-  const ambienti = useLiveQuery(async () => {
-    const ambs = await db.ambienti.where('id_edificio').equals(idEdificio).toArray();
-    return ambs.filter(a => !a._deleted).sort((a, b) => {
-      const timeA = a.last_modified ? new Date(a.last_modified).getTime() : 0;
-      const timeB = b.last_modified ? new Date(b.last_modified).getTime() : 0;
-      return timeB - timeA;
-    });
-  }, [idEdificio]);
+  const ambientiRaw = useLiveQuery(() => db.ambienti.where('id_edificio').equals(idEdificio).toArray(), [idEdificio]);
+  const ambienti = [...(ambientiRaw || [])].filter(a => !a._deleted).sort((a, b) => {
+    const timeA = a.last_modified ? new Date(a.last_modified).getTime() : 0;
+    const timeB = b.last_modified ? new Date(b.last_modified).getTime() : 0;
+    if (ordinamento === 'data_desc') return timeB - timeA;
+    if (ordinamento === 'data_asc') return timeA - timeB;
+    if (ordinamento === 'alfa_asc') return (a.nome || '').localeCompare(b.nome || '');
+    if (ordinamento === 'alfa_desc') return (b.nome || '').localeCompare(a.nome || '');
+    return 0;
+  });
 
   if (!edificio) return null;
 
@@ -172,7 +175,6 @@ export default function DettaglioEdificio() {
     setIdUnitaSelezionata(amb.id_unita || '');
     setErroreNome('');
 
-    // Isoliamo il nome pulito senza l'etichetta dell'unità per ricaricarlo nel form
     const rawNome = amb.nome ? amb.nome.split(' (Sub.')[0].trim() : '';
     setNomeLibero(rawNome);
 
@@ -350,7 +352,6 @@ export default function DettaglioEdificio() {
             </section>
         )}
 
-        {/* --- SISTEMA A TAB --- */}
         <div className="flex border-4 border-white">
           <button
               onClick={() => setActiveTab('stanze')}
@@ -366,7 +367,6 @@ export default function DettaglioEdificio() {
           </button>
         </div>
 
-        {/* CONTENUTO TAB STANZE */}
         {activeTab === 'stanze' && (
             <div className="space-y-8">
               <section className="border-4 border-white p-6">
@@ -440,15 +440,28 @@ export default function DettaglioEdificio() {
               </section>
 
               <section>
-                <div className="flex justify-between items-end mb-6">
-                  <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
-                    <DoorOpen size={24} className="text-green-500" /> Elenco Stanze
-                  </h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2 mb-4">
+                      <DoorOpen size={24} className="text-green-500" /> Elenco Stanze
+                    </h3>
+                    <select
+                        value={ordinamento}
+                        onChange={(e) => setOrdinamento(e.target.value)}
+                        className="bg-black border-2 border-zinc-700 text-zinc-400 p-2 uppercase text-xs font-bold focus:border-green-500 focus:text-green-500 outline-none cursor-pointer"
+                    >
+                      <option value="data_desc">Ordina: Più recenti</option>
+                      <option value="data_asc">Ordina: Meno recenti</option>
+                      <option value="alfa_asc">Ordina: Alfabetico (A-Z)</option>
+                      <option value="alfa_desc">Ordina: Alfabetico (Z-A)</option>
+                    </select>
+                  </div>
                   <div className="text-right">
                     <span className="text-xs sm:text-sm font-bold uppercase text-zinc-400 block mb-1">Totale Registrate</span>
                     <span className="text-3xl sm:text-4xl font-black text-green-500 leading-none">{ambienti?.length || 0}</span>
                   </div>
                 </div>
+
                 {ambienti?.length === 0 ? (
                     <p className="font-bold uppercase p-6 border-2 border-dashed border-zinc-700 text-center text-zinc-500">Nessuna stanza censita in questo fabbricato.</p>
                 ) : (
@@ -458,7 +471,7 @@ export default function DettaglioEdificio() {
                             <Link to={`/ambiente/${ambiente.id}`} className="flex-1 block">
                               <h4 className="text-2xl font-black uppercase group-hover:text-green-500">{ambiente.nome}</h4>
                               <p className="font-bold mt-2 uppercase opacity-80 text-zinc-400">
-                                PIANO: {ambiente.piano} | {ambiente.mq || "NON SPECIFICATO"} | TARGET: {ambiente.lux_normativi} LUX | ASSET: {ambiente.elementi_inseriti?.length || 0}
+                                PIANO: {ambiente.piano} | {ambiente.mq ? Number(ambiente.mq).toFixed(2).replace('.', ',') : "NON SPECIFICATO"} MQ | TARGET: {ambiente.lux_normativi} LUX | ASSET: {ambiente.elementi_inseriti?.length || 0}
                               </p>
                             </Link>
                             <div className="flex items-center gap-2 justify-end border-t-2 border-dashed sm:border-0 border-zinc-800 pt-3 sm:pt-0">
@@ -474,7 +487,6 @@ export default function DettaglioEdificio() {
             </div>
         )}
 
-        {/* CONTENUTO TAB GENERATORI */}
         {activeTab === 'generatori' && (
             <div className="space-y-8">
               <section className="border-4 border-white p-6">

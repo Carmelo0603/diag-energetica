@@ -12,14 +12,20 @@ export default function Dashboard() {
   const [macroCategoria, setMacroCategoria] = useState('');
   const [tipologiaSpecifica, setTipologiaSpecifica] = useState('');
   const [noteAggiuntive, setNoteAggiuntive] = useState('');
-
   const [edificioInModifica, setEdificioInModifica] = useState(null);
 
-  // Carichiamo solo i cantieri che NON sono stati segnati come eliminati
-  const edifici = useLiveQuery(async () => {
-    const all = await db.edifici.filter(e => !e._deleted).toArray();
-    // Ordine cronologico decrescente
-    return all.sort((a, b) => new Date(b.data_creazione).getTime() - new Date(a.data_creazione).getTime());
+  const [ordinamento, setOrdinamento] = useState('data_desc');
+
+  const edificiRaw = useLiveQuery(() => db.edifici.filter(e => !e._deleted).toArray());
+
+  const edifici = [...(edificiRaw || [])].sort((a, b) => {
+    const timeA = new Date(a.data_creazione).getTime();
+    const timeB = new Date(b.data_creazione).getTime();
+    if (ordinamento === 'data_desc') return timeB - timeA;
+    if (ordinamento === 'data_asc') return timeA - timeB;
+    if (ordinamento === 'alfa_asc') return (a.nome || '').localeCompare(b.nome || '');
+    if (ordinamento === 'alfa_desc') return (b.nome || '').localeCompare(a.nome || '');
+    return 0;
   });
 
   const handleCreaOAggiornaEdificio = async (e) => {
@@ -60,10 +66,7 @@ export default function Dashboard() {
   const handleEliminaEdificio = async (e, id) => {
     e.preventDefault();
     if (window.confirm("Attenzione: eliminando il cantiere cancellerai tutte le sue stanze e l'intero inventario. Procedere?")) {
-      // Invece di cancellarlo fisicamente, lo segniamo come eliminato così il Sync lo rimuoverà dal cloud
       await db.edifici.update(id, { _deleted: true, is_synced: 0, last_modified: new Date().toISOString() });
-
-      // E nascondiamo anche tutte le sue stanze per coerenza
       const ambs = await db.ambienti.where('id_edificio').equals(id).toArray();
       for (let a of ambs) {
         await db.ambienti.update(a.id, { _deleted: true, is_synced: 0, last_modified: new Date().toISOString() });
@@ -167,9 +170,22 @@ export default function Dashboard() {
         </section>
 
         <section>
-          <h2 className="text-xl font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
-            <Building2 size={24} className="text-green-500" /> Archivio Rilievi
-          </h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
+              <Building2 size={24} className="text-green-500" /> Archivio Rilievi
+            </h2>
+            <select
+                value={ordinamento}
+                onChange={(e) => setOrdinamento(e.target.value)}
+                className="bg-black border-2 border-zinc-700 text-zinc-400 p-2 uppercase text-xs font-bold focus:border-green-500 focus:text-green-500 outline-none cursor-pointer"
+            >
+              <option value="data_desc">Ordina: Più recenti</option>
+              <option value="data_asc">Ordina: Meno recenti</option>
+              <option value="alfa_asc">Ordina: Alfabetico (A-Z)</option>
+              <option value="alfa_desc">Ordina: Alfabetico (Z-A)</option>
+            </select>
+          </div>
+
           {(!edifici || edifici.length === 0) ? (
               <p className="font-bold uppercase p-6 border-2 border-dashed border-zinc-700 text-center text-zinc-500">Nessun cantiere trovato.</p>
           ) : (

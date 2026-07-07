@@ -4,23 +4,18 @@ import { DIZIONARIO_RADIATORI } from "../data/dizionario_radiatori";
 export default function FormTermico({ onSalva, initialData = null, onAnnulla = null }) {
   const [tipoTermico, setTipoTermico] = useState("radiatore");
 
-  // Dati Radiatore (Aggiornati al nuovo dizionario)
+  // Dati Radiatore
   const [materiale, setMateriale] = useState("");
   const [interasse, setInterasse] = useState("");
   const [numeroElementi, setNumeroElementi] = useState("");
   const [quantitaRadiatori, setQuantitaRadiatori] = useState("");
 
-  // Dati Split
-  const [splitLabel, setSplitLabel] = useState("");
-  const [splitWatt, setSplitWatt] = useState("");
-  const [quantitaSplit, setQuantitaSplit] = useState("");
-
-  // Dati Fancoil / Radiante
+  // Dati Clima (Split / Fancoil ora condividono gli stessi stati)
   const [marca, setMarca] = useState("");
   const [modello, setModello] = useState("");
   const [potenzaRisc, setPotenzaRisc] = useState("");
   const [potenzaRaff, setPotenzaRaff] = useState("");
-  const [quantitaFancoil, setQuantitaFancoil] = useState("");
+  const [quantitaClima, setQuantitaClima] = useState("");
 
   // Dati Canalizzato
   const [potenzaMacchina, setPotenzaMacchina] = useState("");
@@ -39,16 +34,12 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
         setInterasse(initialData.interasse_key || "");
         setNumeroElementi(initialData.numero_elementi || "");
         setQuantitaRadiatori(initialData.quantita || "");
-      } else if (initialData.sotto_categoria === "split") {
-        setSplitLabel(initialData.label || "");
-        setSplitWatt(initialData.watt_unitario || "");
-        setQuantitaSplit(initialData.quantita || "");
-      } else if (initialData.sotto_categoria === "fancoil") {
-        setMarca(initialData.marca || "");
+      } else if (initialData.sotto_categoria === "split" || initialData.sotto_categoria === "fancoil") {
+        setMarca(initialData.marca || initialData.label || "");
         setModello(initialData.modello || "");
-        setPotenzaRisc(initialData.potenza_risc || "");
+        setPotenzaRisc(initialData.potenza_risc || initialData.watt_unitario || "");
         setPotenzaRaff(initialData.potenza_raff || "");
-        setQuantitaFancoil(initialData.quantita || "");
+        setQuantitaClima(initialData.quantita || "");
       } else if (initialData.sotto_categoria === "canalizzato") {
         setPotenzaMacchina(initialData.potenza_macchina || "");
       } else if (initialData.sotto_categoria === "pavimento_radiante" || initialData.sotto_categoria === "soffitto_radiante") {
@@ -58,6 +49,12 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
         setModello(initialData.modello || "");
       }
       setNote(initialData.note || "");
+    } else {
+      // SVUOTA IL FORM QUANDO INITIALDATA DIVENTA NULL
+      setTipoTermico("radiatore");
+      setMateriale(""); setInterasse(""); setNumeroElementi(""); setQuantitaRadiatori("");
+      setMarca(""); setModello(""); setPotenzaRisc(""); setPotenzaRaff(""); setQuantitaClima("");
+      setPotenzaMacchina(""); setSuperficie(""); setPassoPosa(""); setNote("");
     }
   }, [initialData]);
 
@@ -92,18 +89,9 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
         watt_per_elemento: wElem,
         carico_totale_w: wElem * numEl * qRad
       };
-    } else if (tipoTermico === "split") {
-      if (!splitLabel || !splitWatt || !quantitaSplit) return;
-      payload = {
-        ...payload,
-        label: splitLabel,
-        watt_unitario: parseInt(splitWatt, 10),
-        quantita: parseInt(quantitaSplit, 10),
-        carico_totale_w: parseInt(splitWatt, 10) * parseInt(quantitaSplit, 10)
-      };
-    } else if (tipoTermico === "fancoil") {
-      if (!quantitaFancoil) return;
-      const q = parseInt(quantitaFancoil, 10);
+    } else if (tipoTermico === "split" || tipoTermico === "fancoil") {
+      if (!quantitaClima) return;
+      const q = parseInt(quantitaClima, 10);
       const pRisc = potenzaRisc ? parseFloat(potenzaRisc) : 0;
       const pRaff = potenzaRaff ? parseFloat(potenzaRaff) : 0;
 
@@ -136,8 +124,7 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
 
     if (!initialData) {
       setMateriale(""); setInterasse(""); setNumeroElementi(""); setQuantitaRadiatori("");
-      setSplitLabel(""); setSplitWatt(""); setQuantitaSplit("");
-      setMarca(""); setModello(""); setPotenzaRisc(""); setPotenzaRaff(""); setQuantitaFancoil("");
+      setMarca(""); setModello(""); setPotenzaRisc(""); setPotenzaRaff(""); setQuantitaClima("");
       setPotenzaMacchina(""); setSuperficie(""); setPassoPosa(""); setNote("");
     }
   };
@@ -199,32 +186,15 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
               </>
           )}
 
-          {tipoTermico === "split" && (
-              <>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold uppercase mb-2">Dettaglio / Modello</label>
-                  <input type="text" placeholder="ES. DAIKIN INVERTER 12000 BTU" value={splitLabel} onChange={(e) => setSplitLabel(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold uppercase mb-2">Watt Assorbiti (Dati di targa)</label>
-                  <input type="number" value={splitWatt} onChange={(e) => setSplitWatt(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold uppercase mb-2">Quantità</label>
-                  <input type="number" min="1" placeholder="ES. 1" value={quantitaSplit} onChange={(e) => setQuantitaSplit(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold" required />
-                </div>
-              </>
-          )}
-
-          {tipoTermico === "fancoil" && (
+          {(tipoTermico === "split" || tipoTermico === "fancoil") && (
               <>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Marca</label>
-                  <input type="text" placeholder="ES. SABIANA" value={marca} onChange={(e) => setMarca(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
+                  <input type="text" placeholder="ES. DAIKIN / SABIANA" value={marca} onChange={(e) => setMarca(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Modello</label>
-                  <input type="text" placeholder="ES. CARISMA" value={modello} onChange={(e) => setModello(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
+                  <input type="text" placeholder="ES. INVERTER 12000 BTU" value={modello} onChange={(e) => setModello(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold uppercase mb-2">Potenza Termica Risc. (W)</label>
@@ -235,8 +205,8 @@ export default function FormTermico({ onSalva, initialData = null, onAnnulla = n
                   <input type="number" step="0.01" value={potenzaRaff} onChange={(e) => setPotenzaRaff(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-bold uppercase mb-2">Quantità Fancoil Identici</label>
-                  <input type="number" min="1" placeholder="ES. 1" required value={quantitaFancoil} onChange={(e) => setQuantitaFancoil(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
+                  <label className="block text-sm font-bold uppercase mb-2">Quantità Identici</label>
+                  <input type="number" min="1" placeholder="ES. 1" required value={quantitaClima} onChange={(e) => setQuantitaClima(e.target.value)} className="w-full bg-black border-2 border-white p-4 focus:outline-none focus:border-green-500 focus:bg-green-500 focus:text-black text-white uppercase font-bold"  />
                 </div>
               </>
           )}

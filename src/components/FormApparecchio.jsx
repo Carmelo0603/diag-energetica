@@ -51,8 +51,8 @@ const ASSET_SCUOLE_UFFICI = [
   { id: "scaldacqua_50", label: "scaldacqua elettrico 50 litri", watt: 1200, tipo: "apparecchi", categoria: "apparecchio" },
   { id: "scaldacqua_80", label: "scaldacqua elettrico 80 litri", watt: 1500, tipo: "apparecchi", categoria: "apparecchio" },
   { id: "stampante_ls", label: "stampante laser", watt: 600, tipo: "apparecchi", categoria: "apparecchio" },
-
   { id: "stampante_ink", label: "stampante INK", watt: 26, tipo: "apparecchi", categoria: "apparecchio" },
+  { id: "proiettore", label: "proiettore", watt: 320, tipo: "apparecchi", categoria: "apparecchio" },
 ];
 
 const ASSET_CASA_DI_RIPOSO = [
@@ -121,6 +121,15 @@ export default function FormApparecchio({ onSalva, tipoForm, initialData = null,
       setLampadePerPunto(initialData.lampade_per_punto || "");
       setQuantitaApparecchi(initialData.quantita || "");
       setNote(initialData.note || "");
+    } else {
+      setAssetId("");
+      setCustomLabel("");
+      setCustomWatt("");
+      setCustomLumen("");
+      setPuntiLuce("");
+      setLampadePerPunto("");
+      setQuantitaApparecchi("");
+      setNote("");
     }
   }, [initialData]);
 

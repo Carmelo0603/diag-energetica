@@ -12,6 +12,11 @@ export default function FormInfissi({ onSalva, initialData = null, onAnnulla = n
       setTipoVetro(initialData.tipo_vetro || "");
       setQuantita(initialData.quantita || "");
       setNote(initialData.note || "");
+    } else {
+      setTipologia("");
+      setTipoVetro("");
+      setQuantita("");
+      setNote("");
     }
   }, [initialData]);
 

@@ -71,7 +71,9 @@ export const NORMATIVA_LUX = {
       { id: "scuola_servizi", label: "Servizi igienici e antibagni", lux_normativi: 200 },
       { id: "scuola_uffici", label: "Uffici, Presidenza e Sala professori", lux_normativi: 500 },
       { id: "scuola_infermeria", label: "Infermeria e locali di primo soccorso", lux_normativi: 500 },
-      { id: "scuola_mense", label: "Mense scolastiche e refettori", lux_normativi: 200 }
+      { id: "scuola_mense", label: "Mense scolastiche e refettori", lux_normativi: 200 },
+      { id: "locali_tecnici", label: "Locali impianti tecnici" , lux_normativi: 200 },
+      { id: "scuola_deposito", label: "Deposito/Magazzino" , lux_normativi: 100 }
     ],
   }
 };

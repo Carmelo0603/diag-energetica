@@ -22,7 +22,9 @@ const REQUISITI_SCUOLE = [
   ["Servizi igienici e antibagni", 200, 25, 80, "UNI EN 12464-1:2021", "Garantire comunque un livello minimo di sicurezza e igiene visiva."],
   ["Uffici, Presidenza e Sala professori", 500, 19, 80, "UNI EN 12464-1:2021 / D.Lgs. 81/08", "Stessi identici parametri di un ufficio commerciale standard."],
   ["Infermeria e locali di primo soccorso", 500, 19, 90, "UNI EN 12464-1:2021", "Ra minimo 90 per l'ispezione medica e primo intervento."],
-  ["Mense scolastiche e refettori", 200, 22, 80, "UNI EN 12464-1:2021", "Comfort visivo legato alla socializzazione e al consumo pasti."]
+  ["Mense scolastiche e refettori", 200, 22, 80, "UNI EN 12464-1:2021", "Comfort visivo legato alla socializzazione e al consumo pasti."],
+  ["Locali impianti tecnici", 200, 25, 60, "UNI EN 12464-1:2021", "Luogo adibito alla manutenzione o stanziamento di apparecchiature."],
+  ["Deposito Scuole", 100, 25, 80, "UNI EN 12464-1:2021", "Locali adibiti alla conservazioni di attrezzature"]
 ];
 
 const REQUISITI_UFFICI = [
@@ -140,16 +142,40 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
 
     const intestazioneForniture = `FABBRICATO: ${edificio.nome.toUpperCase()}   |   POD: ${edificio.pods?.join(', ') || 'N/A'}   |   PDR: ${edificio.pdr || 'N/A'}`;
 
+    // NUOVA FUNZIONE: Crea riga 1 (dati edificio) e riga 2 (titolo foglio GRANDE)
     const preparaFoglioConIntestazione = (nomeFoglio, maxColonne) => {
       const ws = workbook.addWorksheet(nomeFoglio);
-      const colLettera = String.fromCharCode(65 + maxColonne - 1);
+
+      const getLetteraColonna = (col) => {
+        let temp, letter = '';
+        while (col > 0) {
+          temp = (col - 1) % 26;
+          letter = String.fromCharCode(temp + 65) + letter;
+          col = (col - temp - 1) / 26;
+        }
+        return letter || 'A';
+      };
+      const colLettera = getLetteraColonna(maxColonne);
+
+      // Riga 1: Dati Edificio
       ws.mergeCells(`A1:${colLettera}1`);
       const cellaM = ws.getCell('A1');
       cellaM.value = intestazioneForniture;
       cellaM.alignment = { horizontal: 'center', vertical: 'middle' };
       cellaM.font = { bold: true, size: 11, color: { argb: 'FF000000' } };
       ws.getRow(1).height = 25;
+
+      // Riga 2: TITOLO GIGANTE DEL FOGLIO
+      ws.mergeCells(`A2:${colLettera}2`);
+      const cellaTitolo = ws.getCell('A2');
+      cellaTitolo.value = nomeFoglio.toUpperCase();
+      cellaTitolo.alignment = { horizontal: 'center', vertical: 'middle' };
+      cellaTitolo.font = { bold: true, size: 14, color: { argb: 'FF000000' } };
+      ws.getRow(2).height = 30;
+
+      // Riga 3: Vuota per distanziare
       ws.addRow([]);
+
       return ws;
     };
 
@@ -173,15 +199,15 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
     if (isIllum) {
       const wsConfronto = preparaFoglioConIntestazione('CALCOLO ILLUMINAZIONE', 25);
 
-      wsConfronto.mergeCells('A3:M3');
-      wsConfronto.getCell('A3').value = 'Stato di fatto';
-      wsConfronto.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
-      wsConfronto.getCell('A3').font = { bold: true };
+      wsConfronto.mergeCells('A4:M4');
+      wsConfronto.getCell('A4').value = 'Stato di fatto';
+      wsConfronto.getCell('A4').alignment = { horizontal: 'center', vertical: 'middle' };
+      wsConfronto.getCell('A4').font = { bold: true };
 
-      wsConfronto.mergeCells('O3:Y3');
-      wsConfronto.getCell('O3').value = 'Progetto';
-      wsConfronto.getCell('O3').alignment = { horizontal: 'center', vertical: 'middle' };
-      wsConfronto.getCell('O3').font = { bold: true };
+      wsConfronto.mergeCells('O4:Y4');
+      wsConfronto.getCell('O4').value = 'Progetto';
+      wsConfronto.getCell('O4').alignment = { horizontal: 'center', vertical: 'middle' };
+      wsConfronto.getCell('O4').font = { bold: true };
 
       const headerRow = [
         "Piano", "Ambiente/Attività", "Illuminamento Medio lux", "Sup. mq", "Tipo", "N. Punti luce", "lampade per punto luce", "Tot. Lampade", "Watt/cad", "watt tot.", "lumen cad", "lumen tot", "lux tot. stato di fatto",
@@ -189,9 +215,9 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
         "Tipo", "N. Punti luce", "lampade per punto luce", "Tot. lampade progetto", "Watt/cad", "watt tot.", "lumen cad", "Lumen totali", "Lux totali PROGETTO", "Verifica", "lux previsti da norma"
       ];
       wsConfronto.addRow(headerRow);
-      wsConfronto.getRow(4).font = { bold: true };
+      wsConfronto.getRow(5).font = { bold: true };
 
-      let startRow = 5;
+      let startRow = 6;
 
       ambienti.forEach(ambiente => {
         let hasIllum = ambiente.elementi_inseriti?.some(el => el.categoria === 'illuminazione');
@@ -209,7 +235,7 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
               wsConfronto.getCell(`A${rIdx}`).value = ambiente.piano || "-";
               wsConfronto.getCell(`B${rIdx}`).value = ambiente.nome;
               wsConfronto.getCell(`C${rIdx}`).value = luxNorm;
-              wsConfronto.getCell(`D${rIdx}`).value = ambiente.mq || "";
+              wsConfronto.getCell(`D${rIdx}`).value = ambiente.mq ? Number(parseFloat(ambiente.mq).toFixed(2)) : "";
               wsConfronto.getCell(`E${rIdx}`).value = el.label;
               wsConfronto.getCell(`F${rIdx}`).value = pLuce;
               wsConfronto.getCell(`G${rIdx}`).value = el.lampade_per_punto ? Math.round(el.lampade_per_punto) : 1;
@@ -223,14 +249,14 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
               wsConfronto.getCell(`N${rIdx}`).value = "";
 
               wsConfronto.getCell(`O${rIdx}`).value = tipoProg;
-              wsConfronto.getCell(`O${rIdx}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['\'ILLUMINAZ PROGETTO\'!$A$2:$A$100'] };
+              wsConfronto.getCell(`O${rIdx}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['\'ILLUMINAZ PROGETTO\'!$A$5:$A$100'] };
 
               wsConfronto.getCell(`P${rIdx}`).value = { formula: `F${rIdx}` };
               wsConfronto.getCell(`Q${rIdx}`).value = qtyProg;
               wsConfronto.getCell(`R${rIdx}`).value = { formula: `P${rIdx}*Q${rIdx}` };
-              wsConfronto.getCell(`S${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$A$2:$E$100,2,FALSE))` };
+              wsConfronto.getCell(`S${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$A$5:$E$100,2,FALSE))` };
               wsConfronto.getCell(`T${rIdx}`).value = { formula: `IF(ISBLANK(S${rIdx}),"",R${rIdx}*S${rIdx})` };
-              wsConfronto.getCell(`U${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$A$2:$E$100,3,FALSE))` };
+              wsConfronto.getCell(`U${rIdx}`).value = { formula: `IF(ISBLANK(O${rIdx}),"",VLOOKUP(O${rIdx},'ILLUMINAZ PROGETTO'!$A$5:$E$100,3,FALSE))` };
               wsConfronto.getCell(`V${rIdx}`).value = { formula: `IF(ISBLANK(U${rIdx}),"",R${rIdx}*U${rIdx})` };
               wsConfronto.getCell(`W${rIdx}`).value = { formula: `IF(OR(ISBLANK(D${rIdx}),ISBLANK(V${rIdx})),"",ROUND((V${rIdx}*0.375)/D${rIdx},0))` };
               wsConfronto.getCell(`X${rIdx}`).value = { formula: `IF(ISBLANK(W${rIdx}),"",IF(W${rIdx}>=Y${rIdx},"OK","NO"))` };
@@ -247,38 +273,47 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsConfronto.getColumn('O').width = 40;
 
       const wsReq = preparaFoglioConIntestazione('REQUISITI ILLUMINOTECNICI', 6);
-      tabellaRequisitiAttiva.forEach((r, idx) => {
+      tabellaRequisitiAttiva.slice(1).forEach((r) => {
         wsReq.addRow(r);
-        if(idx === 0) wsReq.mergeCells(`A${wsReq.rowCount}:F${wsReq.rowCount}`);
       });
-      wsReq.getRow(3).font = { bold: true, size: 12 };
       wsReq.getRow(4).font = { bold: true };
       wsReq.getColumn('A').width = 40;
 
       const wsStato = preparaFoglioConIntestazione('ILLUMINAZIONE STATO DI FATTO', 5);
-      STATO_DI_FATTO.forEach(r => wsStato.addRow(r));
-      wsStato.getRow(3).font = { bold: true };
+      STATO_DI_FATTO.slice(1).forEach(r => wsStato.addRow(r));
+      wsStato.getRow(4).font = { bold: true };
       wsStato.getColumn('A').width = 50;
 
       const wsProgLuci = preparaFoglioConIntestazione('ILLUMINAZ PROGETTO', 5);
-      PROGETTO_LUCI.forEach(r => wsProgLuci.addRow(r));
-      wsProgLuci.getRow(3).font = { bold: true };
+      PROGETTO_LUCI.slice(1).forEach(r => wsProgLuci.addRow(r));
+      wsProgLuci.getRow(4).font = { bold: true };
       wsProgLuci.getColumn('A').width = 60;
 
       const wsVani = preparaFoglioConIntestazione('Aree Nette Vani', 3);
       wsVani.addRow(['Piano', 'VANI', 'Area netta [m²]']);
-      wsVani.getRow(3).font = { bold: true };
+      wsVani.getRow(4).font = { bold: true };
 
-      ambienti.forEach(amb => wsVani.addRow([amb.piano || "", amb.nome, amb.mq || 0]));
+      let totArea = 0;
+      ambienti.forEach(amb => {
+        const area = amb.mq ? Number(parseFloat(amb.mq).toFixed(2)) : 0;
+        wsVani.addRow([amb.piano || "", amb.nome, area]);
+        totArea += area;
+      });
+      if (totArea > 0) {
+        wsVani.addRow([]);
+        wsVani.addRow(["TOTALE", "", Number(totArea.toFixed(2))]);
+        wsVani.getRow(wsVani.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
       wsVani.getColumn('B').width = 35;
     }
 
     if (isInfis) {
       const wsInfissi = preparaFoglioConIntestazione('Infissi', 6);
       wsInfissi.addRow(["Piano", "Ambiente", "Tipologia Telaio", "Tipo Vetro", "Quantità", "Note / Dimensioni"]);
-      wsInfissi.getRow(3).font = { bold: true };
+      wsInfissi.getRow(4).font = { bold: true };
 
       let lastAmbInfis = null;
+      let totInfissi = 0;
 
       ambienti.forEach(amb => {
         let hasInfis = amb.elementi_inseriti?.some(el => el.categoria === 'infissi');
@@ -287,11 +322,20 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
           lastAmbInfis = amb.nome;
           amb.elementi_inseriti.forEach(el => {
             if (el.categoria === 'infissi') {
-              wsInfissi.addRow([amb.piano || "", amb.nome, el.tipologia, el.tipo_vetro, Math.round(el.quantita), el.note || ""]);
+              const q = Math.round(el.quantita);
+              wsInfissi.addRow([amb.piano || "", amb.nome, el.tipologia, el.tipo_vetro, q, el.note || ""]);
+              totInfissi += q;
             }
           });
         }
       });
+
+      if (totInfissi > 0) {
+        wsInfissi.addRow([]);
+        wsInfissi.addRow(["TOTALE", "", "", "", totInfissi, ""]);
+        wsInfissi.getRow(wsInfissi.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
+
       wsInfissi.getColumn('B').width = 25;
       wsInfissi.getColumn('C').width = 25;
       wsInfissi.getColumn('D').width = 30;
@@ -299,11 +343,10 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
 
     if (isTermi) {
 
-      // --- NUOVO FOGLIO: GENERATORI DI CALORE (A livello di Edificio) ---
       const generatori = edificio.generatori_calore || [];
       const wsGen = preparaFoglioConIntestazione('Generatori di Calore', 6);
       wsGen.addRow(["Tipologia", "Vettore Energetico", "Marca / Modello", "Potenza Unit. (kW)", "Q.tà", "Potenza Totale (kW)"]);
-      wsGen.getRow(3).font = { bold: true };
+      wsGen.getRow(4).font = { bold: true };
 
       let totKwGenerale = 0;
       let totQtaGenerale = 0;
@@ -327,8 +370,8 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
 
       if (generatori.length > 0) {
         wsGen.addRow([]);
-        wsGen.addRow(["TOTALE GENERALE", "", "", "", totQtaGenerale, Number(totKwGenerale.toFixed(2))]);
-        wsGen.getRow(wsGen.rowCount).font = { bold: true };
+        wsGen.addRow(["TOTALE", "", "", "", totQtaGenerale, Number(totKwGenerale.toFixed(2))]);
+        wsGen.getRow(wsGen.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
       }
 
       wsGen.getColumn('A').width = 25;
@@ -338,41 +381,41 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
       wsGen.getColumn('E').width = 15;
       wsGen.getColumn('F').width = 20;
 
+      const wsTermicoRad = preparaFoglioConIntestazione('Termico - Radiatori', 10);
+      wsTermicoRad.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt / Elem.", "Elementi / Rad.", "Q.tà Radiatori", "Q.tà Elementi Tot.", "Carico Totale W", "Note"]);
+      wsTermicoRad.getRow(4).font = { bold: true };
 
-      // --- FOGLI TERMICI AMBIENTI ---
-      const wsTermicoRad = preparaFoglioConIntestazione('Termico - Radiatori', 9);
-      wsTermicoRad.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt / Elem.", "Elementi / Rad.", "Q.tà Radiatori", "Carico Totale W", "Note"]);
-      wsTermicoRad.getRow(3).font = { bold: true };
-
-      const wsTermicoSplit = preparaFoglioConIntestazione('Termico - Split', 8);
-      wsTermicoSplit.addRow(["Piano", "Ambiente", "Tipologia", "Dettaglio / Modello", "Watt Unitario", "Q.tà", "Carico Totale W", "Note"]);
-      wsTermicoSplit.getRow(3).font = { bold: true };
+      const wsTermicoSplit = preparaFoglioConIntestazione('Termico - Split', 10);
+      wsTermicoSplit.addRow(["Piano", "Ambiente", "Marca", "Modello", "Pot. Risc. Unit. (W)", "Pot. Raff. Unit. (W)", "Q.tà", "Tot. Risc. (W)", "Tot. Raff. (W)", "Note"]);
+      wsTermicoSplit.getRow(4).font = { bold: true };
 
       const wsFancoil = preparaFoglioConIntestazione('Termico - Fancoil', 10);
       wsFancoil.addRow(["Piano", "Ambiente", "Marca", "Modello", "Pot. Risc. Unit. (W)", "Pot. Raff. Unit. (W)", "Q.tà", "Tot. Risc. (W)", "Tot. Raff. (W)", "Note"]);
-      wsFancoil.getRow(3).font = { bold: true };
+      wsFancoil.getRow(4).font = { bold: true };
 
       const wsCanalizzato = preparaFoglioConIntestazione('Termico - Canalizzato', 4);
       wsCanalizzato.addRow(["Piano", "Ambiente", "Potenza Macchina (W)", "Note"]);
-      wsCanalizzato.getRow(3).font = { bold: true };
+      wsCanalizzato.getRow(4).font = { bold: true };
 
       const wsPavimentoRad = preparaFoglioConIntestazione('Termico - Pav. Radiante', 7);
       wsPavimentoRad.addRow(["Piano", "Ambiente", "Marca", "Modello", "Superficie (mq)", "Passo Posa", "Note"]);
-      wsPavimentoRad.getRow(3).font = { bold: true };
+      wsPavimentoRad.getRow(4).font = { bold: true };
 
       const wsSoffittoRad = preparaFoglioConIntestazione('Termico - Soff. Radiante', 7);
       wsSoffittoRad.addRow(["Piano", "Ambiente", "Marca", "Modello", "Superficie (mq)", "Passo Posa", "Note"]);
-      wsSoffittoRad.getRow(3).font = { bold: true };
+      wsSoffittoRad.getRow(4).font = { bold: true };
 
       let totWRad = 0; let totElemRad = 0; let countRad = 0; let lastAmbRad = null;
-      let totWSplit = 0; let totQSplit = 0; let countSplit = 0; let lastAmbSplit = null;
+
+      let countSplit = 0; let lastAmbSplit = null;
+      let totRiscSplit = 0; let totRaffSplit = 0; let totQSplit = 0;
 
       let countFancoil = 0; let lastAmbFancoil = null;
       let totRiscFancoil = 0; let totRaffFancoil = 0; let totQFancoil = 0;
 
-      let countCanal = 0; let lastAmbCanal = null;
-      let countPavRad = 0; let lastAmbPavRad = null;
-      let countSofRad = 0; let lastAmbSofRad = null;
+      let countCanal = 0; let lastAmbCanal = null; let totWCanalizzato = 0;
+      let countPavRad = 0; let lastAmbPavRad = null; let totMqPav = 0;
+      let countSofRad = 0; let lastAmbSofRad = null; let totMqSof = 0;
 
       ambienti.forEach(amb => {
         const insertSpazio = (sottoCat, nome) => {
@@ -401,17 +444,28 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
                 el.watt_per_elemento || el.watt_unitario,
                 numElem,
                 qRad,
+                numElem * qRad,
                 totW,
                 el.note || ""
               ]);
 
               totWRad += totW;
-              totElemRad += (numElem * qRad); // Calcolo esatto di tutti gli elementi fisici presenti nella stanza
-              countRad += qRad; // Conta correttamente quanti radiatori identici hai inserito
+              totElemRad += (numElem * qRad);
+              countRad += qRad;
             } else if (el.sotto_categoria === 'split') {
-              wsTermicoSplit.addRow([amb.piano || "", amb.nome, el.sotto_categoria, el.label, el.watt_unitario, Math.round(el.quantita), Math.round(el.carico_totale_w), el.note || ""]);
-              totWSplit += Math.round(el.carico_totale_w || 0);
-              totQSplit += Math.round(el.quantita || 0);
+              const pRisc = parseFloat(el.potenza_risc) || parseFloat(el.watt_unitario) || 0;
+              const pRaff = parseFloat(el.potenza_raff) || 0;
+              const quantita = parseInt(el.quantita, 10) || 1;
+
+              const totRisc = el.totale_potenza_risc || Number((pRisc * quantita).toFixed(2));
+              const totRaff = el.totale_potenza_raff || Number((pRaff * quantita).toFixed(2));
+
+              const marcaVal = el.marca || el.label || "";
+
+              wsTermicoSplit.addRow([amb.piano || "", amb.nome, marcaVal, el.modello || "", pRisc || "", pRaff || "", quantita, totRisc, totRaff, el.note || ""]);
+              totRiscSplit += totRisc;
+              totRaffSplit += totRaff;
+              totQSplit += quantita;
               countSplit++;
             } else if (el.sotto_categoria === 'fancoil') {
               const pRisc = parseFloat(el.potenza_risc) || 0;
@@ -427,13 +481,19 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
               totQFancoil += quantita;
               countFancoil++;
             } else if (el.sotto_categoria === 'canalizzato') {
-              wsCanalizzato.addRow([amb.piano || "", amb.nome, el.potenza_macchina, el.note || ""]);
+              const pw = parseFloat(el.potenza_macchina) || 0;
+              wsCanalizzato.addRow([amb.piano || "", amb.nome, pw, el.note || ""]);
+              totWCanalizzato += pw;
               countCanal++;
             } else if (el.sotto_categoria === 'pavimento_radiante') {
-              wsPavimentoRad.addRow([amb.piano || "", amb.nome, el.marca, el.modello, el.superficie, el.passo_posa, el.note || ""]);
+              const sup = el.superficie ? Number(parseFloat(el.superficie).toFixed(2)) : 0;
+              wsPavimentoRad.addRow([amb.piano || "", amb.nome, el.marca, el.modello, sup || "", el.passo_posa, el.note || ""]);
+              totMqPav += sup;
               countPavRad++;
             } else if (el.sotto_categoria === 'soffitto_radiante') {
-              wsSoffittoRad.addRow([amb.piano || "", amb.nome, el.marca, el.modello, el.superficie, el.passo_posa, el.note || ""]);
+              const sup = el.superficie ? Number(parseFloat(el.superficie).toFixed(2)) : 0;
+              wsSoffittoRad.addRow([amb.piano || "", amb.nome, el.marca, el.modello, sup || "", el.passo_posa, el.note || ""]);
+              totMqSof += sup;
               countSofRad++;
             }
           }
@@ -442,22 +502,37 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
 
       if (countRad > 0) {
         wsTermicoRad.addRow([]);
-        wsTermicoRad.addRow(["TOTALE GENERALE", "", `N. Radiatori: ${countRad}`, "", "", `Tot. Elementi: ${totElemRad}`, "", totWRad, ""]);
-        wsTermicoRad.getRow(wsTermicoRad.rowCount).font = { bold: true };
+        wsTermicoRad.addRow(["TOTALE", "", "", "", "", "", countRad, totElemRad, totWRad, ""]);
+        wsTermicoRad.getRow(wsTermicoRad.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
       }
       if (countSplit > 0) {
         wsTermicoSplit.addRow([]);
-        wsTermicoSplit.addRow(["TOTALE GENERALE", "", `N. Split: ${countSplit}`, "", "", `Tot. Q.tà: ${totQSplit}`, totWSplit, ""]);
-        wsTermicoSplit.getRow(wsTermicoSplit.rowCount).font = { bold: true };
+        wsTermicoSplit.addRow(["TOTALE", "", "", "", "", "", totQSplit, Number(totRiscSplit.toFixed(2)), Number(totRaffSplit.toFixed(2)), ""]);
+        wsTermicoSplit.getRow(wsTermicoSplit.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
       }
       if (countFancoil > 0) {
         wsFancoil.addRow([]);
-        wsFancoil.addRow(["TOTALE GENERALE", "", `N. Fancoil: ${countFancoil}`, "", "", "", `Tot. Q.tà: ${totQFancoil}`, Number(totRiscFancoil.toFixed(2)), Number(totRaffFancoil.toFixed(2)), ""]);
-        wsFancoil.getRow(wsFancoil.rowCount).font = { bold: true };
+        wsFancoil.addRow(["TOTALE", "", "", "", "", "", totQFancoil, Number(totRiscFancoil.toFixed(2)), Number(totRaffFancoil.toFixed(2)), ""]);
+        wsFancoil.getRow(wsFancoil.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
+      if (countCanal > 0) {
+        wsCanalizzato.addRow([]);
+        wsCanalizzato.addRow(["TOTALE", "", totWCanalizzato, ""]);
+        wsCanalizzato.getRow(wsCanalizzato.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
+      if (countPavRad > 0) {
+        wsPavimentoRad.addRow([]);
+        wsPavimentoRad.addRow(["TOTALE", "", "", "", Number(totMqPav.toFixed(2)), "", ""]);
+        wsPavimentoRad.getRow(wsPavimentoRad.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
+      if (countSofRad > 0) {
+        wsSoffittoRad.addRow([]);
+        wsSoffittoRad.addRow(["TOTALE", "", "", "", Number(totMqSof.toFixed(2)), "", ""]);
+        wsSoffittoRad.getRow(wsSoffittoRad.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
       }
 
-      wsTermicoRad.getColumn('B').width = 25; wsTermicoRad.getColumn('D').width = 35; wsTermicoRad.getColumn('G').width = 15;
-      wsTermicoSplit.getColumn('B').width = 25; wsTermicoSplit.getColumn('D').width = 35;
+      wsTermicoRad.getColumn('B').width = 25; wsTermicoRad.getColumn('D').width = 35; wsTermicoRad.getColumn('G').width = 15; wsTermicoRad.getColumn('H').width = 18;
+      wsTermicoSplit.getColumn('B').width = 25; wsTermicoSplit.getColumn('C').width = 25; wsTermicoSplit.getColumn('D').width = 25; wsTermicoSplit.getColumn('H').width = 15; wsTermicoSplit.getColumn('I').width = 15;
       wsFancoil.getColumn('B').width = 25; wsFancoil.getColumn('C').width = 25; wsFancoil.getColumn('D').width = 25; wsFancoil.getColumn('H').width = 15; wsFancoil.getColumn('I').width = 15;
       wsCanalizzato.getColumn('B').width = 25; wsCanalizzato.getColumn('C').width = 25;
       wsPavimentoRad.getColumn('B').width = 25; wsPavimentoRad.getColumn('C').width = 25; wsPavimentoRad.getColumn('D').width = 25;
@@ -467,9 +542,11 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
     if (isAppar) {
       const wsApparecchi = preparaFoglioConIntestazione('Apparecchiature', 7);
       wsApparecchi.addRow(["Piano", "Ambiente", "Dettaglio Apparecchio", "Watt Unitario", "Quantità", "Carico Totale W", "Note"]);
-      wsApparecchi.getRow(3).font = { bold: true };
+      wsApparecchi.getRow(4).font = { bold: true };
 
-      let totWApparecchi = 0; let lastAmbAppar = null;
+      let totWApparecchi = 0;
+      let totQApparecchi = 0;
+      let lastAmbAppar = null;
 
       ambienti.forEach(amb => {
         let hasAppar = amb.elementi_inseriti?.some(el => el.categoria === 'apparecchio');
@@ -478,16 +555,20 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
           lastAmbAppar = amb.nome;
           amb.elementi_inseriti.forEach(el => {
             if (el.categoria === 'apparecchio') {
-              wsApparecchi.addRow([amb.piano || "", amb.nome, el.label, Math.round(el.watt_unitario), Math.round(el.quantita), Math.round(el.carico_totale_w), el.note || ""]);
+              const q = Math.round(el.quantita);
+              wsApparecchi.addRow([amb.piano || "", amb.nome, el.label, Math.round(el.watt_unitario), q, Math.round(el.carico_totale_w), el.note || ""]);
               totWApparecchi += Math.round(el.carico_totale_w || 0);
+              totQApparecchi += q;
             }
           });
         }
       });
 
-      wsApparecchi.addRow([]);
-      wsApparecchi.addRow(["TOTALE GENERALE", "", "", "", "", totWApparecchi, ""]);
-      wsApparecchi.getRow(wsApparecchi.rowCount).font = { bold: true };
+      if (totQApparecchi > 0) {
+        wsApparecchi.addRow([]);
+        wsApparecchi.addRow(["TOTALE", "", "", "", totQApparecchi, totWApparecchi, ""]);
+        wsApparecchi.getRow(wsApparecchi.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
       wsApparecchi.getColumn('B').width = 25;
       wsApparecchi.getColumn('C').width = 35;
     }
@@ -495,11 +576,11 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
     if (isElettrico) {
       const wsRiepilogoFatto = preparaFoglioConIntestazione('Riep. elettrico Stato di fatto', 5);
       wsRiepilogoFatto.addRow(["Piano", "Ambiente", "Totale Watt Illuminazione", "Totale Watt Apparecchi", "Potenza Elettrica Totale (W)"]);
-      wsRiepilogoFatto.getRow(3).font = { bold: true };
+      wsRiepilogoFatto.getRow(4).font = { bold: true };
 
       const wsRiepilogoProg = preparaFoglioConIntestazione('Riep. elettrico Stato Prog.', 5);
       wsRiepilogoProg.addRow(["Piano", "Ambiente", "Totale Watt Illum. Progetto", "Totale Watt Apparecchi", "Potenza Elettrica Totale (W)"]);
-      wsRiepilogoProg.getRow(3).font = { bold: true };
+      wsRiepilogoProg.getRow(4).font = { bold: true };
 
       let granTotaleIllumFatto = 0;
       let granTotaleIllumProg = 0;
@@ -538,24 +619,67 @@ export async function esportaRilievoExcel(idEdificio, tipoExport) {
         }
       });
 
-      wsRiepilogoFatto.addRow([]);
-      wsRiepilogoFatto.addRow(["TOTALE GENERALE", "", granTotaleIllumFatto, granTotaleAppar, granTotaleIllumFatto + granTotaleAppar]);
-      wsRiepilogoFatto.getRow(wsRiepilogoFatto.rowCount).font = { bold: true };
+      if (granTotaleIllumFatto > 0 || granTotaleAppar > 0) {
+        wsRiepilogoFatto.addRow([]);
+        wsRiepilogoFatto.addRow(["TOTALE", "", granTotaleIllumFatto, granTotaleAppar, granTotaleIllumFatto + granTotaleAppar]);
+        wsRiepilogoFatto.getRow(wsRiepilogoFatto.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
 
       wsRiepilogoFatto.getColumn('B').width = 30;
       wsRiepilogoFatto.getColumn('C').width = 25;
       wsRiepilogoFatto.getColumn('D').width = 25;
       wsRiepilogoFatto.getColumn('E').width = 30;
 
-      wsRiepilogoProg.addRow([]);
-      wsRiepilogoProg.addRow(["TOTALE GENERALE", "", granTotaleIllumProg, granTotaleAppar, granTotaleIllumProg + granTotaleAppar]);
-      wsRiepilogoProg.getRow(wsRiepilogoProg.rowCount).font = { bold: true };
+      if (granTotaleIllumProg > 0 || granTotaleAppar > 0) {
+        wsRiepilogoProg.addRow([]);
+        wsRiepilogoProg.addRow(["TOTALE", "", granTotaleIllumProg, granTotaleAppar, granTotaleIllumProg + granTotaleAppar]);
+        wsRiepilogoProg.getRow(wsRiepilogoProg.rowCount).font = { bold: true, size: 12, color: { argb: 'FF000000' } };
+      }
 
       wsRiepilogoProg.getColumn('B').width = 30;
       wsRiepilogoProg.getColumn('C').width = 30;
       wsRiepilogoProg.getColumn('D').width = 25;
       wsRiepilogoProg.getColumn('E').width = 30;
     }
+
+    // IL TOCCO DA MAESTRO: Algoritmo per le righe alternate (Zebra Striping)
+    workbook.eachSheet((ws) => {
+      let startRow = 5;
+      if (ws.name === 'CALCOLO ILLUMINAZIONE') startRow = 6;
+
+      let isGray = false;
+
+      for (let i = startRow; i <= ws.rowCount; i++) {
+        const row = ws.getRow(i);
+        const firstCellVal = row.getCell(1).value;
+
+        // Ignoriamo colorazioni extra sulle righe dei totali per lasciarle intonse
+        if (firstCellVal === "TOTALE" || firstCellVal === "TOTALE GENERALE") {
+          continue;
+        }
+
+        // Verifichiamo se la riga ha dei dati effettivi e non è un semplice spazio
+        let hasValues = false;
+        row.eachCell((cell) => {
+          if(cell.value !== null && cell.value !== "") hasValues = true;
+        });
+
+        if (hasValues) {
+          if (isGray) {
+            const maxCol = ws.columnCount || 10;
+            for (let c = 1; c <= maxCol; c++) {
+              const cell = row.getCell(c);
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFD9D9D9' } // Grigio elegante 25% (Excel Standard)
+              };
+            }
+          }
+          isGray = !isGray; // Scambia il colore per la prossima riga
+        }
+      }
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
