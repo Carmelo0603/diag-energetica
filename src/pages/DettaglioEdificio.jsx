@@ -96,8 +96,7 @@ export default function DettaglioEdificio() {
     let targetLux = 0;
     const pianoFinale = isCustomPiano ? customPiano.trim().toUpperCase() : pianoStanza;
 
-    const finalMq = superficieMq ? parseFloat(superficieMq) : '';
-
+    const finalMq = superficieMq ? parseFloat(superficieMq) : null;
     if (isCustom) {
       if (!nomeLibero || !customLux) return;
       nomeFinale = unitaLabel ? `${nomeLibero} (${unitaLabel})` : nomeLibero;
