@@ -5,6 +5,7 @@ export const DIZIONARIO_RADIATORI = {
       { id: "alu_350", label: "Interasse 350 mm", watt_elemento: 95 },
       { id: "alu_500", label: "Interasse 500 mm", watt_elemento: 115 },
       { id: "alu_600", label: "Interasse 600 mm", watt_elemento: 135 },
+      { id: "alu_700", label: "Interasse 700 mm", watt_elemento: 160 },
       { id: "alu_800", label: "Interasse 800 mm", watt_elemento: 170 },
     ],
   },
